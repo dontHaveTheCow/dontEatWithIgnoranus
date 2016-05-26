@@ -32,7 +32,7 @@ int main(void){
 
 	goToIdleState();
 
-	//Debug with SPI ->>>>>>> CooCox debugger sucks dicks
+	//Debug with SPI ->>>>>>> CooCox debugger sucks dick
 	SDSELECT();
 	spi_rw(fileSize);
 	spi_rw(fileSize >> 8);
