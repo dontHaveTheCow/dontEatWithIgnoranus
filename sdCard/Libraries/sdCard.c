@@ -327,8 +327,6 @@ uint32_t incrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector){
 	else{
 		return 0;
 	}
-
-
 }
 uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t clusterValue){
 
@@ -381,6 +379,33 @@ uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir){
 }
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir){
 
+	uint8_t directoryCount = 0;
+
+	read_datablock(buff,_mstrDir);
+
+	while(!startsWith(filename,(char*)buff)){
+		//Each byte directory is 32 bytes long
+		//If Short Filename doesn't match, jump to next directory
+		buff = buff + 0x20;
+		directoryCount++;
+		//Check whether you reached the end of the sector
+		if(directoryCount == 16)
+			return 0;
+	}
+	*(buff + FILE_SIZE_OFFSET_LOW1) = sizeInBytes;
+	*(buff + FILE_SIZE_OFFSET_LOW2) = sizeInBytes >> 8;
+	*(buff + FILE_SIZE_OFFSET_HIGH1) = sizeInBytes >> 16;
+	*(buff + FILE_SIZE_OFFSET_HIGH2) = sizeInBytes >> 24;
+
+	if(xmit_datablock(buff, _mstrDir)){
+		return (*(buff + FILE_SIZE_OFFSET_LOW1))
+		       + (*(buff + FILE_SIZE_OFFSET_LOW2) << 8)
+		       + (*(buff + FILE_SIZE_OFFSET_HIGH1) << 16)
+		       + (*(buff + FILE_SIZE_OFFSET_HIGH2) << 24);
+	}
+	else{
+		return 0;
+	}
 }
 
 uint8_t startsWith(const char *pre, const char *str)

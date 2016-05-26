@@ -27,19 +27,18 @@ int main(void){
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
 	first_file_cluster = findFirstClusterOfFile("HAMLET",buffer,mstrDir);
 	next_file_cluster = findNextClusterOfFile(first_file_cluster,buffer,fatSect);
-	fileSize = readFileSize(buffer,"HAMLET",mstrDir);
+	freeClusterCount = decrementFreeClusterCount(buffer,fsInfoSector);
 	delayMs(100);
 
 	goToIdleState();
 
 	//Debug with SPI ->>>>>>> CooCox debugger sucks dick
 	SDSELECT();
-	spi_rw(fileSize);
-	spi_rw(fileSize >> 8);
-	spi_rw(fileSize >> 16);
-	spi_rw(fileSize >> 24);
+	spi_rw(freeClusterCount);
+	spi_rw(freeClusterCount >> 8);
+	spi_rw(freeClusterCount >> 16);
+	spi_rw(freeClusterCount >> 24);
 
-	spi_rw(0x00);
 
 	SDDESELECT();
 
