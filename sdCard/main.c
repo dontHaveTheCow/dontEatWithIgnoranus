@@ -39,6 +39,8 @@ int main(void){
 	spi_rw(fileSize >> 16);
 	spi_rw(fileSize >> 24);
 
+	spi_rw(0x00);
+
 	SDDESELECT();
 
 
