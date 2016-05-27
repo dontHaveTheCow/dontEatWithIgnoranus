@@ -13,8 +13,7 @@
 
 int main(void){
 	uint8_t buffer[512]= "I am the Mattress Bitch I know if I can eat one I can eat 5";
-	uint32_t mstrDir,first_file_cluster, next_file_cluster;
-	uint32_t nextFreeCluster, freeClusterCount;
+	uint32_t mstrDir, cluster;
 	uint32_t fileSize;
 	uint16_t fatSect, fsInfoSector;
 
@@ -25,23 +24,19 @@ int main(void){
 	initializeSD();
 
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-	first_file_cluster = findFirstClusterOfFile("HAMLET",buffer,mstrDir);
-	next_file_cluster = findNextClusterOfFile(first_file_cluster,buffer,fatSect);
-	freeClusterCount = decrementFreeClusterCount(buffer,fsInfoSector);
-	delayMs(100);
+	cluster = findLastClusterOfFile("HAMLET",buffer,mstrDir);
 
+	delayMs(100);
 	goToIdleState();
 
 	//Debug with SPI ->>>>>>> CooCox debugger sucks dick
 	SDSELECT();
-	spi_rw(freeClusterCount);
-	spi_rw(freeClusterCount >> 8);
-	spi_rw(freeClusterCount >> 16);
-	spi_rw(freeClusterCount >> 24);
-
+	spi_rw(cluster);
+	spi_rw(cluster >> 8);
+	spi_rw(cluster >> 16);
+	spi_rw(cluster >> 24);
 
 	SDDESELECT();
-
 
 	while(1){
     }

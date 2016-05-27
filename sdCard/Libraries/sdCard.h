@@ -72,6 +72,7 @@ void findDetailsOfFAT(uint8_t *buff, uint16_t* _fat, uint32_t* _mstrDir, uint16_
 /*--FAT and master directory functions--*/
 uint32_t findFirstClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir);
 uint32_t findNextClusterOfFile(uint32_t currentCluster,uint8_t *buff, uint16_t _fat);
+uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir);
 
 /*--FS  functions--*/
 uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector);
@@ -81,9 +82,9 @@ uint32_t incrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector);
 uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t clusterValue);
 
 /*--File interaction functions--*/
-void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir);
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
+void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSec, uint32_t lastClusterOfFile);
 
 //String functions
 uint8_t startsWith(const char *pre, const char *str);

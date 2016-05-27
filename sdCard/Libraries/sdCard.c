@@ -238,6 +238,23 @@ number of the next cluster of your file (or if all ones, that the current cluste
 	       + ((buff[currentCluster*4+3]) << 24);
 }
 
+uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir){
+
+	uint32_t tmpCluster, lastCluster;
+
+	lastCluster = findFirstClusterOfFile(filename,buff,_mstrDir);
+	/* Refer to the comment in findNextClusterOfFile() function */
+
+	while(tmpCluster != 0xF0FFFFFF){
+		tmpCluster = buff[lastCluster*4]
+		       	       + ((buff[lastCluster*4+1]) << 8)
+		       	       + ((buff[lastCluster*4+2]) << 16)
+		       	       + ((buff[lastCluster*4+3]) << 24);
+	}
+
+	return tmpCluster;
+}
+
 uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector){
 
 	/* ...Next free cluster is located in fs info sector */
@@ -248,6 +265,7 @@ uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector){
 	       + ((buff[NEXT_FREE_CLUSTER_HIGH1]) << 16)
 	       + ((buff[NEXT_FREE_CLUSTER_HIGH2]) << 24);
 }
+
 uint32_t findFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector){
 
 	/* ...Free cluster count is located in fs info sector */
@@ -350,11 +368,6 @@ uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t c
 		return 0;
 	}
 }
-
-void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir){
-
-}
-
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir){
 
 	uint8_t directoryCount = 0;
@@ -406,6 +419,27 @@ uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint
 	else{
 		return 0;
 	}
+}
+
+void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile){
+
+	//find first cluster of file
+
+	//find last cluster of file based on FAT
+
+	//find last sector of file based on File size
+
+	//write to the file
+
+	//update file size
+
+	//update FAT if necessary
+
+	//update free cluster size if necessary
+
+	//update next cluster if necessary
+
+
 }
 
 uint8_t startsWith(const char *pre, const char *str)
