@@ -72,7 +72,7 @@ void findDetailsOfFAT(uint8_t *buff, uint16_t* _fat, uint32_t* _mstrDir, uint16_
 /*--FAT and master directory functions--*/
 uint32_t findFirstClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir);
 uint32_t findNextClusterOfFile(uint32_t currentCluster,uint8_t *buff, uint16_t _fat);
-uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir);
+uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uint32_t _mstrDir);
 
 /*--FS  functions--*/
 uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector);

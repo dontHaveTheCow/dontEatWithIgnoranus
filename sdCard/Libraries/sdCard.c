@@ -238,26 +238,40 @@ number of the next cluster of your file (or if all ones, that the current cluste
 	       + ((buff[currentCluster*4+3]) << 24);
 }
 
-uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir){
+uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uint32_t _mstrDir){
 
 	uint32_t tmpCluster, lastCluster;
 
-	lastCluster = findFirstClusterOfFile(filename,buff,_mstrDir);
+	tmpCluster = findFirstClusterOfFile(filename,buff,_mstrDir);
 	/* Refer to the comment in findNextClusterOfFile() function */
 
-	while(tmpCluster != 0xF0FFFFFF){
-		tmpCluster = buff[lastCluster*4]
-		       	       + ((buff[lastCluster*4+1]) << 8)
-		       	       + ((buff[lastCluster*4+2]) << 16)
-		       	       + ((buff[lastCluster*4+3]) << 24);
-	}
+	//Right now, the buffer is filled with master directory sector
+	//When you have found the first cluster, fill the buffer with FAT sector
+	read_datablock(buff,_fat);
 
-	return tmpCluster;
+	while(tmpCluster != 0x0FFFFFFF){
+	//while(tmpCluster != 0x00000080){
+		lastCluster = tmpCluster;
+		tmpCluster = buff[(lastCluster%0x80)*4]
+		       	       + ((buff[(lastCluster%0x80)*4+1]) << 8)
+		       	       + ((buff[(lastCluster%0x80)*4+2]) << 16)
+		       	       + ((buff[(lastCluster%0x80)*4+3]) << 24);
+
+		if(tmpCluster % 0x80 == 0)
+			read_datablock(buff, ++_fat);
+	}
+	return lastCluster;
+
+	/* Just a remainder!
+	 * Each FAT sector contains of 128 (0x80) entries
+	 * So after each 0x80 entries buffer is filled again with a next sector
+	 * */
 }
+
 
 uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector){
 
-	/* ...Next free cluster is located in fs info sector */
+	/* ...Next free cluster is located in fs dginfo sector */
 
 	read_datablock(buff,_fsInfoSector);
 	return buff[NEXT_FREE_CLUSTER_LOW1]

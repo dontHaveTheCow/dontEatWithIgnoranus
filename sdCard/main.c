@@ -24,7 +24,7 @@ int main(void){
 	initializeSD();
 
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-	cluster = findLastClusterOfFile("HAMLET",buffer,mstrDir);
+	cluster = findLastClusterOfFile("HAMLET",buffer,fatSect,mstrDir);
 
 	delayMs(100);
 	goToIdleState();
