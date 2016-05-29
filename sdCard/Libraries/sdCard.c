@@ -435,24 +435,48 @@ uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint
 	}
 }
 
-void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile){
+void writeLastSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t _fatSect){
+
+	uint32_t fileSize;
+	uint32_t cluster;
 
 	//find first cluster of file
-
 	//find last cluster of file based on FAT
-
+	cluster = findLastClusterOfFile(filename,buff,_fatSect,_mstrDir);
 	//find last sector of file based on File size
-
+	fileSize = readFileSize(buff,filename,_mstrDir);
+	//Check whether the current sector is not the last one
+	if((fileSize % 4096 ) / 512 < 7)
+		cluster = cluster - 2;
+	else
+		//if the current sector is the last one, write to next cluster
+		cluster = cluster - 1;
 	//write to the file
-
+	xmit_datablock(buff, cluster*8 + 16384);
 	//update file size
-
+	if(fileSize%512 == 0){
+		writeFileSize(buff,filename,fileSize + 512);
+	}
+	else{
+		writeFileSize(buff,filename,(fileSize - fileSize%512) + 1024);
+	}
 	//update FAT if necessary
 
 	//update free cluster size if necessary
 
 	//update next cluster if necessary
 
+
+}
+
+
+/*
+ * filesize / 512  = sector count
+ * filesize / 4096 = cluster count
+ *
+ */
+
+void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile){
 
 }
 

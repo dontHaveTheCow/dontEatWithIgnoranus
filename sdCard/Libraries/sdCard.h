@@ -84,7 +84,9 @@ uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t c
 /*--File interaction functions--*/
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
-void writeSectorToFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSec, uint32_t lastClusterOfFile);
+uint32_t writeLastSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
+uint32_t writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t _fatSect, uint32_t lastClusterOfFile);
+
 
 //String functions
 uint8_t startsWith(const char *pre, const char *str);
