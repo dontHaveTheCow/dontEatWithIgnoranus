@@ -14,7 +14,6 @@
 int main(void){
 	uint8_t buffer[512]= "I am the Mattress Bitch I know if I can eat one I can eat 5";
 	uint32_t mstrDir, cluster;
-	uint32_t fileSize;
 	uint16_t fatSect, fsInfoSector;
 
 	initialiseSysTick();
@@ -24,7 +23,7 @@ int main(void){
 	initializeSD();
 
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-	cluster = findLastClusterOfFile("HAMLET",buffer,fatSect,mstrDir);
+	cluster = allocateNewCluster(buffer,fatSect,0x03);
 
 	delayMs(100);
 	goToIdleState();

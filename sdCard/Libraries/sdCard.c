@@ -39,6 +39,9 @@ uint8_t initializeSD(void){
 		SDType = 0;
 	}
 	release_spi();
+
+	interface_speed(INTERFACE_FAST);
+
 	return SDType;
 }
 
@@ -273,11 +276,13 @@ uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector){
 
 	/* ...Next free cluster is located in fs dginfo sector */
 
-	read_datablock(buff,_fsInfoSector);
+	if(read_datablock(buff,_fsInfoSector))
 	return buff[NEXT_FREE_CLUSTER_LOW1]
 	       + ((buff[NEXT_FREE_CLUSTER_LOW2]) << 8)
 	       + ((buff[NEXT_FREE_CLUSTER_HIGH1]) << 16)
 	       + ((buff[NEXT_FREE_CLUSTER_HIGH2]) << 24);
+	else
+		return 0;
 }
 
 uint32_t findFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector){
@@ -333,7 +338,7 @@ uint32_t incrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector){
 
 	read_datablock(buff,_fsInfoSector);
 
-	/* ...Assign value to 32 bit unsigned integer and decrement it by 1 */
+	/* ...Assign value to 32 bit unsigned integer and increment it by 1 */
 
 	clusterValue = (buff[FREE_CLUSTER_COUNT_LOW1])
 	       + ((buff[FREE_CLUSTER_COUNT_LOW2]) << 8)
@@ -362,8 +367,10 @@ uint32_t incrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector){
 }
 uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t clusterValue){
 
-	/* ...Free cluster count is located in fs info sector */
+	//store old fs info sector values in buffer
+	read_datablock(buff,_fsInfoSector);
 
+	/* ...Free cluster count is located in fs info sector */
 	*(buff+NEXT_FREE_CLUSTER_LOW1) = clusterValue;
 	*(buff+NEXT_FREE_CLUSTER_LOW2) = clusterValue >> 8;
 	*(buff+NEXT_FREE_CLUSTER_HIGH1) = clusterValue >> 16;
@@ -382,6 +389,47 @@ uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t c
 		return 0;
 	}
 }
+
+uint32_t update_fsInfo(uint8_t *buff, uint16_t _fsInfoSector, uint32_t nextFreeCluster){
+
+	uint32_t clusterValue;
+	//store old fs info sector values in buffer
+	while(!read_datablock(buff,_fsInfoSector));
+
+	/* ...Assign value to 32 bit unsigned integer and decrement it by 1 */
+
+	clusterValue = (buff[FREE_CLUSTER_COUNT_LOW1])
+	       + ((buff[FREE_CLUSTER_COUNT_LOW2]) << 8)
+	       + ((buff[FREE_CLUSTER_COUNT_HIGH1]) << 16)
+	       + ((buff[FREE_CLUSTER_COUNT_HIGH2]) << 24) - 1;
+
+	/* ...Write new value to buffer */
+
+	*(buff+FREE_CLUSTER_COUNT_LOW1) = clusterValue;
+	*(buff+FREE_CLUSTER_COUNT_LOW2) = clusterValue >> 8;
+	*(buff+FREE_CLUSTER_COUNT_HIGH1) = clusterValue >> 16;
+	*(buff+FREE_CLUSTER_COUNT_HIGH2) = clusterValue >> 24;
+
+	/* ...Next update free cluster count */
+	*(buff+NEXT_FREE_CLUSTER_LOW1) = nextFreeCluster;
+	*(buff+NEXT_FREE_CLUSTER_LOW2) = nextFreeCluster >> 8;
+	*(buff+NEXT_FREE_CLUSTER_HIGH1) = nextFreeCluster >> 16;
+	*(buff+NEXT_FREE_CLUSTER_HIGH2) = nextFreeCluster >> 24;
+
+
+	if(xmit_datablock(buff, _fsInfoSector)){
+		return (buff[NEXT_FREE_CLUSTER_LOW1] )
+		       + ((buff[NEXT_FREE_CLUSTER_LOW2]) << 8)
+		       + ((buff[NEXT_FREE_CLUSTER_HIGH1]) << 16)
+		       + ((buff[NEXT_FREE_CLUSTER_HIGH2]) << 24);
+	}
+	else{
+		return 0;
+	}
+
+
+}
+
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir){
 
 	uint8_t directoryCount = 0;
@@ -453,7 +501,7 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 
 	else{
 		//if the current sector is the last one, write to next cluster
-		cluster = findNextFreeCluster(buff,0x01);
+		cluster = findNextFreeCluster(readBuff,0x01);
 		xmit_datablock(sendBuff, cluster*8 + 16376);
 		//update next free cluster
 		changeNextFreeCluster(readBuff,0x01,++cluster);
@@ -466,7 +514,7 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 
 	}
 	//update file size
-	writeFileSize(buff,filename,fileSize + 512);
+	writeFileSize(readBuff,filename,fileSize + 512,_mstrDir);
 	return cluster;
 }
 
@@ -481,20 +529,37 @@ void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uin
 
 }
 
-uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t currentCluster){
+uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){
 
-	buff += (currentCluster % 0x80)*4;
+	uint32_t nextFreeCluster = findNextFreeCluster(buff,0x01);
 
-	currentCluster = findNextFreeCluster(buff,0x01);
+	//Read FAT sector to overwrite old FAT entries
+	while(!read_datablock(buff,fatSect+(cluster / 0x80)));
 
-	*(buff) = currentCluster;
-	*(buff+1) = currentCluster >> 8;
-	*(buff+2) = currentCluster >> 16;
-	*(buff+3) = currentCluster >> 24;
+	//Write pointer next cluster in place of 0x0FFFFFFF
+	buff[(cluster % 0x80)*4] = nextFreeCluster;
+	buff[(cluster % 0x80)*4+1] = nextFreeCluster >> 8;
+	buff[(cluster % 0x80)*4+2] = nextFreeCluster >> 16;
+	buff[(cluster % 0x80)*4+3] = nextFreeCluster >> 24;
 
-	xmit_datablock(buff,fatSect+(currentCluster / 0x80));
+	buff[(cluster % 0x80)*4+4] = 0xFF;
+	buff[(cluster % 0x80)*4+5] = 0xFF;
+	buff[(cluster % 0x80)*4+6] = 0xFF;
+	buff[(cluster % 0x80)*4+7] = 0x0F;
 
-	return clusterValue;
+
+	//in the place of 0x0FFFFFFF write pointer to last cluster
+	//write 0x0FFFFFFF in next free cluster if it is in the same sector
+	while(!xmit_datablock(buff,fatSect+(cluster / 0x80)));
+
+	//else read the next sector and write the 0xF0000000 value
+
+	//Next free cluster is next to the last cluster
+	nextFreeCluster++;
+	//Put it in while cycle, cause f**k knows why there is an error all the time
+	while(update_fsInfo(buff,0x01,nextFreeCluster) != nextFreeCluster);
+
+	return nextFreeCluster;
 }
 
 uint8_t startsWith(const char *pre, const char *str)
@@ -502,9 +567,3 @@ uint8_t startsWith(const char *pre, const char *str)
     uint8_t lenpre = strlen(pre), lenstr = strlen(str);
     return lenstr < lenpre ? 0 : strncmp(pre, str, lenpre) == 0;
 }
-
-
-
-
-
-

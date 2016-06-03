@@ -80,13 +80,14 @@ uint32_t findFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector);
 uint32_t decrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector);
 uint32_t incrementFreeClusterCount(uint8_t *buff, uint16_t _fsInfoSector);
 uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t clusterValue);
-uint32_t allocateNewCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t currentCluster);
+uint32_t update_fsInfo(uint8_t *buff, uint16_t _fsInfoSector, uint32_t nextFreeCluster);
+uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster);
 
 /*--File interaction functions--*/
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
-uint32_t writeLastSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
-uint32_t writeNextSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect, uint32_t lastClusterOfFile);
+uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
+void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile);
 
 
 //String functions
