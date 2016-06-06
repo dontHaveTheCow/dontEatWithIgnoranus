@@ -495,11 +495,10 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 	//find last sector of file based on File size
 	fileSize = readFileSize(readBuff,filename,_mstrDir);
 	//Check whether the current sector is not the last one
-	if((fileSize % 4096 ) / 512 < 8){
-		//write to the file
+	if(fileSize < 3584){
+		//write to the file in the current cluster
 		xmit_datablock(sendBuff, cluster*8 + 16368 + (fileSize % 4096 ) / 512);
 	}
-
 	else{
 		//if the current sector is the last one, write to next cluster
 		cluster = findNextFreeCluster(readBuff,0x01);
@@ -511,7 +510,6 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 	writeFileSize(readBuff,filename,fileSize + 512,_mstrDir);
 	return cluster;
 }
-
 
 /*
  * filesize / 512  = sector count
