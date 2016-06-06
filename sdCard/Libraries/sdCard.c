@@ -484,7 +484,7 @@ uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint
 	}
 }
 
-uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect){
+uint32_t writeLastSectorOfFile(uint8_t *writeBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect){
 
 	uint32_t fileSize;
 	uint32_t cluster;
@@ -494,17 +494,25 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 	cluster = findLastClusterOfFile(filename,readBuff,_fatSect,_mstrDir);
 	//find last sector of file based on File size
 	fileSize = readFileSize(readBuff,filename,_mstrDir);
-	//Check whether the current sector is not the last one
-	if(fileSize < 3584){
+	//Check whether the current sector is not the last one (4096-512=3584)
+	if((fileSize % 4096) < 3585){
 		//write to the file in the current cluster
-		xmit_datablock(sendBuff, cluster*8 + 16368 + (fileSize % 4096 ) / 512);
+		xmit_datablock(writeBuff, cluster*8 + _mstrDir + (fileSize % 4096) / 512);
+		/*
+		 * 0 -> 0
+		 * 1-512 -> 1
+		 * 513-1024 -> 2
+		 * 1025-1536 -> 3
+		 * 1037-2048 -> 4
+		 * 3072-3584 ->
+		 */
 	}
 	else{
 		//if the current sector is the last one, write to next cluster
 		cluster = findNextFreeCluster(readBuff,0x01);
-		xmit_datablock(sendBuff, cluster*8 + 16376);
+		xmit_datablock(writeBuff, cluster*8 + _mstrDir);
 		//update next free cluster
-		allocateNewCluster(sendBuff,_fatSect,cluster);
+		allocateNewCluster(writeBuff,_fatSect,cluster);
 	}
 	//update file size
 	writeFileSize(readBuff,filename,fileSize + 512,_mstrDir);
