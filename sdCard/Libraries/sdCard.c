@@ -246,6 +246,7 @@ uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uin
 	uint32_t tmpCluster, lastCluster;
 
 	tmpCluster = findFirstClusterOfFile(filename,buff,_mstrDir);
+	lastCluster = tmpCluster;
 	/* Refer to the comment in findNextClusterOfFile() function */
 
 	//Right now, the buffer is filled with master directory sector
@@ -504,14 +505,7 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
 		cluster = findNextFreeCluster(readBuff,0x01);
 		xmit_datablock(sendBuff, cluster*8 + 16376);
 		//update next free cluster
-		changeNextFreeCluster(readBuff,0x01,++cluster);
-		//update FAT
-
-		//update free cluster count
-		//fs info sector is 0x01 in most of the times
-		decrementFreeClusterCount(readBuff,0x01);
-
-
+		allocateNewCluster(sendBuff,_fatSect,cluster);
 	}
 	//update file size
 	writeFileSize(readBuff,filename,fileSize + 512,_mstrDir);
@@ -526,6 +520,8 @@ uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filen
  */
 
 void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile){
+
+	//uint32_t fileSize = readFileSize(readBuff,filename,_mstrDir);
 
 }
 
@@ -542,15 +538,29 @@ uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){
 	buff[(cluster % 0x80)*4+2] = nextFreeCluster >> 16;
 	buff[(cluster % 0x80)*4+3] = nextFreeCluster >> 24;
 
-	buff[(cluster % 0x80)*4+4] = 0xFF;
-	buff[(cluster % 0x80)*4+5] = 0xFF;
-	buff[(cluster % 0x80)*4+6] = 0xFF;
-	buff[(cluster % 0x80)*4+7] = 0x0F;
-
-
+	if((cluster / 0x80) != (nextFreeCluster / 0x80)){
+		//If next free cluster is located in the next sector
+		//Overwrite the last sector data
+		while(!xmit_datablock(buff,fatSect+(cluster / 0x80)));
+		//Read next sector
+		while(!read_datablock(buff,fatSect+(nextFreeCluster / 0x80)));
+		buff[(nextFreeCluster % 0x80)*4] = 0xFF;;
+		buff[(nextFreeCluster % 0x80)*4+1] = 0xFF;
+		buff[(nextFreeCluster % 0x80)*4+2] = 0xFF;
+		buff[(nextFreeCluster % 0x80)*4+3] = 0x0F;
+		//Write 0xF0 FF FF FF to new next free cluster
+		while(!xmit_datablock(buff,fatSect+(nextFreeCluster / 0x80)));
+	}
+	else{
+		buff[(cluster % 0x80)*4+4] = 0xFF;
+		buff[(cluster % 0x80)*4+5] = 0xFF;
+		buff[(cluster % 0x80)*4+6] = 0xFF;
+		buff[(cluster % 0x80)*4+7] = 0x0F;
+		while(!xmit_datablock(buff,fatSect+(cluster / 0x80)));
+	}
 	//in the place of 0x0FFFFFFF write pointer to last cluster
 	//write 0x0FFFFFFF in next free cluster if it is in the same sector
-	while(!xmit_datablock(buff,fatSect+(cluster / 0x80)));
+
 
 	//else read the next sector and write the 0xF0000000 value
 

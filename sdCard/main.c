@@ -23,7 +23,7 @@ int main(void){
 	initializeSD();
 
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-	cluster = allocateNewCluster(buffer,fatSect,0x03);
+	cluster = findLastClusterOfFile("LOG     TXT",buffer,fatSect,mstrDir);
 
 	delayMs(100);
 	goToIdleState();
