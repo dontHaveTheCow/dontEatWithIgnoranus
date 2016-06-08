@@ -12,8 +12,11 @@
 #include "SysTickDelay.h"
 
 int main(void){
-	uint8_t buffer[512]= "I am the Mattress Bitch I know if I can eat one I can eat 5";
-	uint32_t mstrDir, cluster;
+	uint8_t buffer[512];
+	uint8_t sector;
+	uint32_t mstrDir;
+	uint32_t cluster;
+	uint32_t filesize;
 	uint16_t fatSect, fsInfoSector;
 
 	initialiseSysTick();
@@ -23,10 +26,15 @@ int main(void){
 	initializeSD();
 
 	findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-	cluster = findLastClusterOfFile("LOG     TXT",buffer,fatSect,mstrDir);
+
+	findDetailsOfFile("LOGFILE",buffer,mstrDir,&filesize,&cluster,&sector);
+
+	cluster = findLastClusterOfFile("LOGFILE",buffer,fatSect,mstrDir);
+
+	writeNextSectorOfFile(buffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
 
 	delayMs(100);
-	goToIdleState();
+	while(!goToIdleState());
 
 	//Debug with SPI ->>>>>>> CooCox debugger sucks dick
 	SDSELECT();

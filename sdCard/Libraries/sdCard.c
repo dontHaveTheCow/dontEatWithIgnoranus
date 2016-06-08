@@ -40,7 +40,7 @@ uint8_t initializeSD(void){
 	}
 	release_spi();
 
-	interface_speed(INTERFACE_FAST);
+	//interface_speed(INTERFACE_FAST);
 
 	return SDType;
 }
@@ -189,6 +189,7 @@ void findDetailsOfFAT(uint8_t *buff, uint16_t* _fat, uint32_t* _mstrDir, uint16_
 	//read boot sector (sector 0) to find reserved sectors, fat size and number of fat's
 	//fat_begin_lba = Number_of_Reserved_Sectors;
 	//cluster_begin_lba =Number_of_Reserved_Sectors + (Number_of_FATs * Sectors_Per_FAT);
+	delayMs(1);
 	read_datablock(buff,0);
 	*_fat = buff[RESERVED_SECTORS_1] + (buff[RESERVED_SECTORS_2] << 8);
 	*_mstrDir = *_fat +	buff[NUMBER_OF_FATS] *
@@ -206,7 +207,7 @@ uint32_t findFirstClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir
 
 	uint8_t directoryCount = 0;
 
-	read_datablock(buff,_mstrDir);
+	while(!read_datablock(buff,_mstrDir));
 
 	while(!startsWith(filename,(char*)buff)){
 		//Each byte directory is 32 bytes long
@@ -222,6 +223,37 @@ uint32_t findFirstClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir
 		   + (*(buff + FIRST_FILE_CLUSTER_LOW2) << 8)
 		   + (*(buff + FIRST_FILE_CLUSTER_HIGH1) << 16)
 		   + (*(buff + FIRST_FILE_CLUSTER_HIGH2) << 24);
+}
+
+uint8_t findDetailsOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir, uint32_t *_filesize, uint32_t *cluster, uint8_t *_sector){
+	uint8_t directoryCount = 0;
+	delayMs(1);
+	while(!read_datablock(buff,_mstrDir));
+	delayMs(1);
+	while(!startsWith(filename,(char*)buff)){
+		//Each byte directory is 32 bytes long
+		//If Short Filename doesn't match, jump to next directory
+		buff = buff + 0x20;
+		directoryCount++;
+		//Check whether you reached the end of the sector
+		if(directoryCount == 16)
+			return 0;
+	}
+
+	*cluster = *(buff + FIRST_FILE_CLUSTER_LOW1)
+				   + (*(buff + FIRST_FILE_CLUSTER_LOW2) << 8)
+				   + (*(buff + FIRST_FILE_CLUSTER_HIGH1) << 16)
+				   + (*(buff + FIRST_FILE_CLUSTER_HIGH2) << 24);
+
+	*_filesize = *(buff + FILE_SIZE_OFFSET_LOW1)
+			   + (*(buff + FILE_SIZE_OFFSET_LOW2) << 8)
+			   + (*(buff + FILE_SIZE_OFFSET_HIGH1) << 16)
+			   + (*(buff + FILE_SIZE_OFFSET_HIGH2) << 24);
+
+
+	*_sector = ((*_filesize % 4096) + 511)/512;
+
+	return 1;
 }
 
 uint32_t findNextClusterOfFile(uint32_t currentCluster,uint8_t *buff, uint16_t _fat){
@@ -244,13 +276,14 @@ number of the next cluster of your file (or if all ones, that the current cluste
 uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uint32_t _mstrDir){
 
 	uint32_t tmpCluster, lastCluster;
-
+	delayMs(1);
 	tmpCluster = findFirstClusterOfFile(filename,buff,_mstrDir);
 	lastCluster = tmpCluster;
 	/* Refer to the comment in findNextClusterOfFile() function */
 
 	//Right now, the buffer is filled with master directory sector
 	//When you have found the first cluster, fill the buffer with FAT sector
+	delayMs(1);
 	read_datablock(buff,_fat);
 
 	while(tmpCluster != 0x0FFFFFFF){
@@ -261,8 +294,11 @@ uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uin
 		       	       + ((buff[(lastCluster%0x80)*4+2]) << 16)
 		       	       + ((buff[(lastCluster%0x80)*4+3]) << 24);
 
-		if(tmpCluster % 0x80 == 0)
+		if(tmpCluster % 0x80 == 0){
+			delayMs(1);
 			read_datablock(buff, ++_fat);
+		}
+
 	}
 	return lastCluster;
 
@@ -453,41 +489,49 @@ uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir){
 		   + (*(buff + FILE_SIZE_OFFSET_HIGH2) << 24);
 
 }
+
+uint8_t findSectorToWrite(uint32_t filesize){
+	return ((filesize % 4096) + 511)/512;
+}
+
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir){
 
 	uint8_t directoryCount = 0;
 
-	read_datablock(buff,_mstrDir);
+	while(!read_datablock(buff,_mstrDir));
 
-	while(!startsWith(filename,(char*)buff)){
-		//Each byte directory is 32 bytes long
-		//If Short Filename doesn't match, jump to next directory
-		buff = buff + 0x20;
-		directoryCount++;
+	//Each byte directory is 32 bytes long
+	//If Short Filename doesn't match, jump to next directory
+	while(!startsWith(filename,(char*)buff+directoryCount*0x20)){
+		//buff = buff + 0x20;
 		//Check whether you reached the end of the sector
-		if(directoryCount == 16)
+		if(++directoryCount == 15)
 			return 0;
 	}
-	*(buff + FILE_SIZE_OFFSET_LOW1) = sizeInBytes;
-	*(buff + FILE_SIZE_OFFSET_LOW2) = sizeInBytes >> 8;
-	*(buff + FILE_SIZE_OFFSET_HIGH1) = sizeInBytes >> 16;
-	*(buff + FILE_SIZE_OFFSET_HIGH2) = sizeInBytes >> 24;
 
-	if(xmit_datablock(buff, _mstrDir)){
+	*(buff + FILE_SIZE_OFFSET_LOW1+directoryCount*0x20) = sizeInBytes;
+	*(buff + FILE_SIZE_OFFSET_LOW2+directoryCount*0x20) = sizeInBytes >> 8;
+	*(buff + FILE_SIZE_OFFSET_HIGH1+directoryCount*0x20) = sizeInBytes >> 16;
+	*(buff + FILE_SIZE_OFFSET_HIGH2+directoryCount*0x20) = sizeInBytes >> 24;
+
+	while(!xmit_datablock(buff, _mstrDir));
 		return (*(buff + FILE_SIZE_OFFSET_LOW1))
 		       + (*(buff + FILE_SIZE_OFFSET_LOW2) << 8)
 		       + (*(buff + FILE_SIZE_OFFSET_HIGH1) << 16)
 		       + (*(buff + FILE_SIZE_OFFSET_HIGH2) << 24);
-	}
-	else{
-		return 0;
-	}
 }
 
-uint32_t writeLastSectorOfFile(uint8_t *writeBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect){
+/*uint32_t writeLastSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect){
+
+ *
+ * FUCKING MALLOC NOT WORKING
+
 
 	uint32_t fileSize;
 	uint32_t cluster;
+	void *readBuff = (uint8_t*)malloc(512*sizeof(uint8_t));
+	if(readBuff==NULL)
+		return 0;
 
 	//find first cluster of file
 	//find last cluster of file based on FAT
@@ -497,27 +541,32 @@ uint32_t writeLastSectorOfFile(uint8_t *writeBuff, uint8_t *readBuff, char* file
 	//Check whether the current sector is not the last one (4096-512=3584)
 	if((fileSize % 4096) < 3585){
 		//write to the file in the current cluster
-		xmit_datablock(writeBuff, cluster*8 + _mstrDir + (fileSize % 4096) / 512);
-		/*
-		 * 0 -> 0
-		 * 1-512 -> 1
-		 * 513-1024 -> 2
-		 * 1025-1536 -> 3
-		 * 1037-2048 -> 4
-		 * 3072-3584 ->
-		 */
+
+		 * if size 0         -> write to 0 sector
+		 * if size 1-512     -> write to 1 sector
+		 * if size 513-1024  -> write to 2 sector
+		 * if size 1025-1536 -> write to 3 sector
+		 * if size 1037-2048 -> write to 4 sector
+		 * if size 1037-2048 -> write to 4 sector
+		 * if size 3072-3584 -> write to 7 sector
+
+		xmit_datablock(writeBuff, cluster*8 + (_mstrDir - 16) + ((fileSize % 4096) + 511)/512);
+
 	}
 	else{
 		//if the current sector is the last one, write to next cluster
 		cluster = findNextFreeCluster(readBuff,0x01);
-		xmit_datablock(writeBuff, cluster*8 + _mstrDir);
+		xmit_datablock(writeBuff, cluster*8 + (_mstrDir - 16));
 		//update next free cluster
-		allocateNewCluster(writeBuff,_fatSect,cluster);
+		allocateNewCluster(readBuff,_fatSect,cluster);
 	}
 	//update file size
-	writeFileSize(readBuff,filename,fileSize + 512,_mstrDir);
+	writeFileSize(writeBuff,filename,fileSize + 512,_mstrDir);
+
+	free(readBuff);
+
 	return cluster;
-}
+}*/
 
 /*
  * filesize / 512  = sector count
@@ -525,10 +574,23 @@ uint32_t writeLastSectorOfFile(uint8_t *writeBuff, uint8_t *readBuff, char* file
  *
  */
 
-void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile){
+uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector){
 
 	//uint32_t fileSize = readFileSize(readBuff,filename,_mstrDir);
+	delayMs(1);
+	if(!xmit_datablock(writeBuff, (*cluster)*8 + (_mstrDir - 16) + *sector))
+		return 0;
+	delayMs(1);
+	if(!writeFileSize(writeBuff,filename,*filesize += 512,_mstrDir))
+		return 0;
 
+	if(++(*sector) > 7){
+		delayMs(1);
+		*sector = 0;
+		*cluster = allocateNewCluster(writeBuff,fatSect,*cluster);
+	}
+
+	return 1;
 }
 
 uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){
@@ -575,7 +637,7 @@ uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){
 	//Put it in while cycle, cause f**k knows why there is an error all the time
 	while(update_fsInfo(buff,0x01,nextFreeCluster) != nextFreeCluster);
 
-	return nextFreeCluster;
+	return nextFreeCluster-1;
 }
 
 uint8_t startsWith(const char *pre, const char *str)

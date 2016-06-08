@@ -1,9 +1,17 @@
 #ifndef SDCARD_LIBRARY
 #define SDCARD_LIBRARY
 
+/*Description about SD card controller and FAT32
+ *http://www.dejazzer.com/ee379/lecture_notes/lec12_sd_card.pdf
+ *http://www.engineersgarage.com/embedded/avr-microcontroller-projects/sd-card-interfacing-project
+ *https://www.pjrc.com/tech/8051/ide/fat32.html
+ */
+
 //These are the Includes
 #include <SPI1.h>
 #include <string.h>
+#include <stdlib.h>
+#include "SysTickDelay.h"
 
 //These are the Define statements
 #define SDSELECT()      GPIOB->BRR = (1<<1)  // pin low, MMC CS = L
@@ -71,6 +79,7 @@ void findDetailsOfFAT(uint8_t *buff, uint16_t* _fat, uint32_t* _mstrDir, uint16_
 
 /*--FAT and master directory functions--*/
 uint32_t findFirstClusterOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir);
+uint8_t findDetailsOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir, uint32_t *_filesize, uint32_t *cluster, uint8_t *_sector);
 uint32_t findNextClusterOfFile(uint32_t currentCluster,uint8_t *buff, uint16_t _fat);
 uint32_t findLastClusterOfFile(char* filename, uint8_t *buff, uint16_t _fat, uint32_t _mstrDir);
 
@@ -83,11 +92,13 @@ uint32_t changeNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector, uint32_t c
 uint32_t update_fsInfo(uint8_t *buff, uint16_t _fsInfoSector, uint32_t nextFreeCluster);
 uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster);
 
+
 /*--File interaction functions--*/
 uint32_t readFileSize(uint8_t *buff, char* filename, uint32_t _mstrDir);
+uint8_t findSectorToWrite(uint32_t filesize);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
-uint32_t writeLastSectorOfFile(uint8_t *sendBuff, uint8_t *readBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
-void writeNextSectorOfFile(uint8_t *buff, char* filename, uint32_t _mstrDir, uint16_t fatSect, uint32_t lastClusterOfFile);
+//uint32_t writeLastSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
+uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
 
 
 //String functions
