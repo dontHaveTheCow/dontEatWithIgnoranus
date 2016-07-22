@@ -9,6 +9,7 @@
 #define BAUD_9600 9600
 #define RXBUFFERSIZE 0x20
 #define TXBUFFERSIZE 0x20
+#define DELAY 100
 
 uint8_t RxBuffer[RXBUFFERSIZE];
 uint8_t TxBuffer[TXBUFFERSIZE];
@@ -18,6 +19,7 @@ bool stringRecieved;
 int main(void){
 
 	//Initialize board
+	initializeRedLed5();
 	initializeGreenLed1();
 	initializeGreenLed2();
 	initializeGreenLed3();
@@ -33,8 +35,30 @@ int main(void){
 	ConfigureUsart1Interrupt();
 
 	while(1){
-		delayMs(1000);
-		blinkGreenLed1();
+		GPIOB->ODR ^= GPIO_Pin_5;
+		delayMs(DELAY);
+		GPIOB->ODR ^= GPIO_Pin_5;
+		GPIOB->ODR ^= GPIO_Pin_6;
+		delayMs(DELAY);
+		GPIOB->ODR ^= GPIO_Pin_6;
+		GPIOB->ODR ^= GPIO_Pin_7;
+		delayMs(DELAY);
+		GPIOB->ODR ^= GPIO_Pin_7;
+		GPIOB->ODR ^= GPIO_Pin_8;
+		delayMs(DELAY);
+		GPIOB->ODR ^= GPIO_Pin_8;
+		GPIOB->ODR ^= GPIO_Pin_9;
+		delayMs(DELAY);
+		GPIOB->ODR ^= GPIO_Pin_9;
+		GPIOC->ODR ^= GPIO_Pin_6;
+		delayMs(DELAY);
+		GPIOC->ODR ^= GPIO_Pin_6;
+		GPIOC->ODR ^= GPIO_Pin_7;
+		delayMs(DELAY);
+		GPIOC->ODR ^= GPIO_Pin_7;
+		GPIOC->ODR ^= GPIO_Pin_8;
+		delayMs(DELAY);
+		GPIOC->ODR ^= GPIO_Pin_8;
     }
 }
 

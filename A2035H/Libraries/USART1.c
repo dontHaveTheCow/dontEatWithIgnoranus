@@ -1,42 +1,48 @@
 #include "USART1.h"
 
-void Usart1Init(void)
-{
-	GPIO_InitTypeDef GPIO_InitStructure;
-	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+void Usart1_Init(int baudrate){
 
-	  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
-	  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-	  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-	  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	  GPIO_Init(GPIOA, &GPIO_InitStructure);
+		/* Enable GPIO clock */
+		RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 
-    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_1);
-	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_1);
+		/* Enable USART clock */
+		RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 
-	/* Connect pin to Periph */
+		GPIO_InitTypeDef GPIO_InitStructure;
+	    USART_InitTypeDef USART_InitStructure;
 
-	USART_DeInit(USART1);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
-	USART_InitTypeDef USART1_InitStructure;
+	    /* Configure USART Tx, Rx as alternate function push-pull */
+	    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
+	    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	    GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	    GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-	USART_ClockInitTypeDef USART_ClockInitStructure;
-	USART_ClockStructInit(&USART_ClockInitStructure);
-	USART_ClockInit(USART1, &USART_ClockInitStructure);
+	    USART_InitStructure.USART_BaudRate = baudrate;
+	    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	    USART_InitStructure.USART_Parity = USART_Parity_No;
+	    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
-	USART1_InitStructure.USART_BaudRate = 9600;
-	USART1_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-	USART1_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
-	USART1_InitStructure.USART_Parity = USART_Parity_No;
-	USART1_InitStructure.USART_StopBits = USART_StopBits_1;
-	USART1_InitStructure.USART_WordLength = USART_WordLength_8b;
-	USART_Init(USART1, &USART1_InitStructure);
+	    /* Connect PXx to USARTx_Tx */
+	    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_1);
 
-	USART_Cmd(USART1, ENABLE);
+	    /* Connect PXx to USARTx_Rx */
+	    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_1);
+
+	    /* USART configuration */
+	    USART_Init(USART1, &USART_InitStructure);
+
+	    /* Enable USART */
+	    USART_Cmd(USART1, ENABLE);
+
+
+
 }
 
-void Usart1Send(uint8_t data)
+void Usart1_Send(uint8_t data)
 {
 	USART_SendData(USART1,data);
 	while(USART_GetFlagStatus(USART1, USART_FLAG_TC ) == RESET)
@@ -44,14 +50,13 @@ void Usart1Send(uint8_t data)
 	}
 }
 
-void Usart1SendString(char* string){
+void Usart1_SendString(char* string){
 	while(*string != 0){
-		Usart1Send(*string++);
+		Usart1_Send(*string++);
 	}
 }
 
-char* Usart1RecieveString(void){
-	char* String;
+char* Usart1_RecieveString(char* String){
 	while(*String != '/r'){
 		while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
 		*String++ = USART_ReceiveData(USART1);
@@ -59,37 +64,22 @@ char* Usart1RecieveString(void){
 	return String;
 }
 
-char* Usart1Recieve(void)
+char* Usart1_Recieve(void)
 {
 	while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
-	return USART_ReceiveData(USART1);
+	return (char*)USART_ReceiveData(USART1);
 }
 
 void ConfigureUsart1Interrupt(void)
 {
-	NVIC_InitTypeDef NVIC_structure;
-	NVIC_structure.NVIC_IRQChannel = USART1_IRQn;
-	NVIC_structure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_structure.NVIC_IRQChannelPriority = 0x0F;
-	NVIC_Init(&NVIC_structure);
-	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
-}
+	  NVIC_InitTypeDef NVIC_InitStructure;
 
-void waitForOkResponse(void){
-	while(!stringRecieved && strcmp(usartRecievedStringBuffer ,"OK/r") != 0);
-	stringRecieved = false;
-	memset(usartRecievedStringBuffer,0,sizeof(usartRecievedStringBuffer));
-	usartRecievedStringLenght = 0;
-	blinkIndicationLedOnce();
-}
+	  /* Enable the USART1 Interrupt */
+	  NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;
+	  NVIC_InitStructure.NVIC_IRQChannelPriority = 0;
+	  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	  NVIC_Init(&NVIC_InitStructure);
 
-void USART1_IRQHandler(void)
-{
-	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
-	{
-		usartRecievedStringBuffer[usartRecievedStringLenght++] = USART_ReceiveData(USART1);
-		if(USART_ReceiveData(USART1) == '\r')
-			stringRecieved = true;
-	}
+	  USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);
 }
 

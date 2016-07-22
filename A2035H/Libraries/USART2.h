@@ -8,10 +8,12 @@
 #include <stm32f0xx_rcc.h>
 
 //These are the prototypes for the routines
-void Usart2Init(void);
-void Usart2Send(uint8_t data);
-uint8_t Usart2Recieve(void);
-void ConfigureUsartInterrupt(void);
-void usart2SendString(char* string);
+void Usart2_Init(int baudrate);
+void Usart2_Send(uint8_t data);
+uint8_t Usart2_Recieve(void);
+void ConfigureUsart2Interrupt(void);
+void Usart2_SendString(char* string);
+
+
 
 #endif
