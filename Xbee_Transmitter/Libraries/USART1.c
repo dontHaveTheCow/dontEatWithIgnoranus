@@ -57,17 +57,17 @@ void Usart1_SendString(char* string){
 }
 
 char* Usart1_RecieveString(char* String){
-	while(*String != '/r'){
+	while(*String != '\r'){
 		while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
 		*String++ = USART_ReceiveData(USART1);
 	}
 	return String;
 }
 
-char* Usart1_Recieve(void)
+uint16_t Usart1_Recieve(void)
 {
 	while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
-	return (char*)USART_ReceiveData(USART1);
+	return USART_ReceiveData(USART1);
 }
 
 void ConfigureUsart1Interrupt(void)

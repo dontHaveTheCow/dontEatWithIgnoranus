@@ -54,7 +54,7 @@ void getZ(int16_t *z, int16_t *z_low, int16_t *z_high){
 	*z = (*z_high << 8) + *z_low;
 }
 
-int16_t getZV2(void){
+int16_t returnZ_axis(void){
 
 	int16_t z_low = 0;
 	int16_t z_high = 0;

@@ -52,6 +52,15 @@ void InitialiseSPI1()
 	SPI_Cmd(SPI1, ENABLE);
 }
 
+void Configure_SPI1_interrupt(void)
+{
+	NVIC_InitTypeDef NVIC_InitStructure;
+	NVIC_InitStructure.NVIC_IRQChannel = SPI1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_InitStructure.NVIC_IRQChannelPriority = 0x0F;
+	NVIC_Init(&NVIC_InitStructure);
+}
+
 void SPI1_SendByte(uint8_t byte)
 {
 	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
@@ -70,6 +79,15 @@ void SPI1_ManualSendByte(uint8_t byte)
 
 }
 
+uint8_t SPI1_RecieveByte()
+{
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET); //wait buffer empty
+	SPI_SendData8(SPI1,0x00);
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
+	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);
+	return SPI_ReceiveData8(SPI1);
+}
+
 uint8_t SPI1_TransRecieve(uint8_t data){
 	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);
 	SPI_SendData8(SPI1,data);
@@ -80,21 +98,7 @@ uint8_t SPI1_TransRecieve(uint8_t data){
 	SPI_I2S_ClearFlag(SPI1, SPI_I2S_FLAG_RXNE);
 }
 
-uint8_t SPI1_RecieveByte()
-{
-	SPI_ManualSendByte(0x00);
-	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);
-	return SPI_ReceiveData8(SPI1);
-}
 
 
-void Configure_SPI1_interrupt(void)
-{
-	NVIC_InitTypeDef NVIC_InitStructure;
-	NVIC_InitStructure.NVIC_IRQChannel = SPI1_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_InitStructure.NVIC_IRQChannelPriority = 0x0F;
-	NVIC_Init(&NVIC_InitStructure);
-}
 
 

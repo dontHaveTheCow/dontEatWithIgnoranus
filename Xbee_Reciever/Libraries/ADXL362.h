@@ -18,7 +18,7 @@ void writeADXL326Register(uint8_t reg, uint8_t cmd);
 uint8_t readADXL362Register(uint8_t reg);
 int16_t SPIreadTwoRegisters(uint8_t regAddress);
 void getZ(int16_t *z, int16_t *z_low, int16_t *z_high);
-int16_t getZV2(void);
+int16_t returnZ_axis(void);
 
 
 #endif

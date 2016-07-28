@@ -12,7 +12,7 @@
 //These are the prototypes for the routines
 void Usart1_Init(int baudrate);
 void Usart1_Send(uint8_t data);
-char* Usart1_Recieve(void);
+uint16_t Usart1_Recieve(void);
 void ConfigureUsart1Interrupt(void);
 void Usart1_SendString(char* string);
 char* Usart1_RecieveString(char* String);

@@ -31,7 +31,7 @@ void apply1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1){
 
 	int8_t cheksum = 0;
 
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_LOW();
 	SPI1_TransRecieve(0x7E);
 	SPI1_TransRecieve(0x00);
 	SPI1_TransRecieve(0x05);
@@ -52,103 +52,7 @@ void apply1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1){
 
 	SPI1_TransRecieve(0xFF - cheksum); //Checksum
 
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-}
-
-void apply2Params(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x06);
-	//AT command
-	SPI1_TransRecieve(0x08);
-	cheksum += 0x08;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param1;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-
-}
-void apply3Params(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2, uint8_t param3){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x07);
-	//AT command
-	SPI1_TransRecieve(0x08);
-	cheksum += 0x08;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param2;
-	SPI1_TransRecieve(param3);
-	cheksum += param3;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-
-}
-void apply4Params(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2, uint8_t param3, uint8_t param4){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x08);
-	//AT command
-	SPI1_TransRecieve(0x08);
-	cheksum += 0x08;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param2;
-	SPI1_TransRecieve(param3);
-	cheksum += param3;
-	SPI1_TransRecieve(param4);
-	cheksum += param4;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_HIGH();
     blinkGreenLed3();
 }
 
@@ -156,7 +60,7 @@ void queue1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1){
 
 	int8_t cheksum = 0;
 
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_LOW();
 	SPI1_TransRecieve(0x7E);
 	SPI1_TransRecieve(0x00);
 	SPI1_TransRecieve(0x05);
@@ -172,116 +76,23 @@ void queue1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1){
 	cheksum += param1;
 	SPI1_TransRecieve(0xFF - cheksum);
 	delayMs(10);
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_HIGH();
    	delay_1s();
     blinkGreenLed3();
 }
 
-void queue2Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x06);
-	//AT command
-	SPI1_TransRecieve(0x09);
-	cheksum += 0x09;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param1;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-
-}
-void queue3Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2, uint8_t param3){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x07);
-	//AT command
-	SPI1_TransRecieve(0x09);
-	cheksum += 0x09;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param2;
-	SPI1_TransRecieve(param3);
-	cheksum += param3;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-
-}
-void queue4Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1, uint8_t param2, uint8_t param3, uint8_t param4){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x08);
-	//AT command
-	SPI1_TransRecieve(0x09);
-	cheksum += 0x09;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve(MSbyte); //Command
-	cheksum += MSbyte;
-	SPI1_TransRecieve(LSbyte);
-	cheksum += LSbyte;
-
-	 //Parameters goes here
-	SPI1_TransRecieve(param1);
-	cheksum += param1;
-	SPI1_TransRecieve(param2);
-	cheksum += param2;
-	SPI1_TransRecieve(param3);
-	cheksum += param3;
-	SPI1_TransRecieve(param4);
-	cheksum += param4;
-
-	SPI1_TransRecieve(0xFF - cheksum); //Checksum
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-    blinkGreenLed3();
-}
 
 uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
 
-	int8_t cheksum = 0, data = 0;
+	uint32_t data = 0;
+	uint8_t cheksum = 0;
 	uint8_t length, i = 0;
+	int timer = 0;
 
 	while(readingPacket); //Check if rf packets aren't incoming at the same time
 
 	readingPacket = true;
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_LOW();
 	SPI1_TransRecieve(0x7E);
 	SPI1_TransRecieve(0x00);
 	SPI1_TransRecieve(0x04); //Lenght
@@ -295,73 +106,39 @@ uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
 	cheksum += LSbyte;
 	SPI1_TransRecieve(0xFF - cheksum);
 	cheksum = 0;
-	while(SPI1_TransRecieve(0x00) != 0x7E);	//Wait for xbee to make AT command response
+	//Wait for xbee to make AT command response
+	while(SPI1_TransRecieve(0x00) != 0x7E){
+		//Iterate timer to prevent function of going into endless loop
+		timer++;
+		if(timer > 100)
+			return 0xFF;
+	}
 	SPI1_TransRecieve(0x00);
 	length = SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x00);	//Type of packet
-	SPI1_TransRecieve(0x00);	//Response
-	SPI1_TransRecieve(0x00);	//AT
-	SPI1_TransRecieve(0x00);	//Command
-	SPI1_TransRecieve(0x00);	//Command status
+	cheksum +=SPI1_TransRecieve(0x00);	//Type of packet
+	cheksum +=SPI1_TransRecieve(0x00);	//Response
+	cheksum +=SPI1_TransRecieve(0x00);	//AT
+	cheksum +=SPI1_TransRecieve(0x00);	//Command
+	cheksum +=SPI1_TransRecieve(0x00);	//Command status
 	for(i=5; i < length; i ++ ){
-		data |= (SPI1_TransRecieve(0x00) << 8*(i-5));
-		cheksum += data;
+		//Command response parameter wont be longer than 4 bytes
+		data |= SPI1_TransRecieve(0x00) << (8*(8-i));
+		cheksum += (data & (0xFF << 8*(8-i))) >> (8*(8-i));
 	}
-	cheksum += SPI1_TransRecieve(0x00);
+	cheksum += SPI1_TransRecieve(0x00); //Cheksum
+	XBEE_CS_HIGH();
 	if(cheksum == 0xFF){
-		//dataUpdeted = true;
+		#ifdef DEBUG
+		Usart1_SendString("*AT command read correct*\n");
+		#endif
+		return data;
 	}
 	readingPacket = false;
 	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-
-	return data;
-}
-
-void SPIdumpRead(void){
-	uint8_t i = 0;
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	for(; i < 100; i ++){
-		SPI1_TransRecieve(0x00);
-	}
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-}
-
-void restoreDefaults(){
-
-	int8_t cheksum = 0;
-
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-	SPI1_TransRecieve(0x7E);
-	SPI1_TransRecieve(0x00);
-	SPI1_TransRecieve(0x04);
-	SPI1_TransRecieve(0x08); 	//AT command
-	cheksum += 0x08;
-	SPI1_TransRecieve(0x52); //Frame ID
-	cheksum += 0x52;
-	SPI1_TransRecieve('R'); // Restore Defaults
-	cheksum += 'R';
-	SPI1_TransRecieve('E');
-	cheksum += 'E';
-	/*
-	 * Parameters goes here
-	 */
-	SPI1_TransRecieve(0xFF - cheksum); //Cheksum
-
-	//Response from slave
-	SPI1_TransRecieve(0x00);
-
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
-   	delay_1s();
-    blinkGreenLed3();
-}
-
-
-
-void initializeXbeeAPI(void){
-	delayMs(10);
-	restoreDefaults();
-	delayMs(10);
-	//applyModuleParams();
+	#ifdef DEBUG
+	Usart1_SendString("*AT command read error - cheksum*\n");
+	#endif
+	return 0xFF;
 }
 
 void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uint8_t adr5, uint8_t adr6, uint8_t adr7, uint8_t adr8, char* data){
@@ -370,7 +147,7 @@ void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uin
 	uint8_t  lenghtOfData, i = 0;
 	lenghtOfData = strlen(data);
 
-	GPIO_ResetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_LOW();
 	SPI1_TransRecieve(0x7E);
 	SPI1_TransRecieve(0x00);	//Lenght
 	SPI1_TransRecieve(14 + lenghtOfData);
@@ -407,6 +184,6 @@ void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uin
 		cheksum += data[i];
 	}
 	SPI1_TransRecieve(0xFF - cheksum); //Cheksum
-	GPIO_SetBits(GPIOA,GPIO_Pin_4);
+	XBEE_CS_HIGH();
 }
 
