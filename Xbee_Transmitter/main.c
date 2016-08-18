@@ -31,7 +31,7 @@ bool readingPacket = false;
 
 //Dewi globals
 static uint8_t state = 1;	//0 -> ACC 1 -> RSSI 2 -> GPS
-bool RSSI_previouslySent = false;
+bool static RSSI_previouslySent = false;
 
 int main(void){
 
@@ -45,12 +45,21 @@ int main(void){
 	initializeRedLed3();
 	initializeRedLed4();
 	initializeRedLed5();
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*GPIO initialized *\n");
+	#endif
 	//Usart1 for debugging and serial communication
 	Usart1_Init(9600);
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*USART initialized *\n");
+	#endif
 	//System clock for delays
 	initialiseSysTick();
 	//Turn on first status led
 	GPIOC->ODR = (1 << (state+6));
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*Systick initialized *\n");
+	#endif
 
 	//Xbee initialization
 	InitialiseSPI1_GPIO();
@@ -59,16 +68,56 @@ int main(void){
 	initializeXbeeATTnPin();
 	char transmitString[8];
 
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*Xbee initialized *\n");
+	#endif
+
 	//ADXL362Z
 	InitialiseSPI2_GPIO();
 	InitialiseSPI2();
 	initializeADXL362();
+	while(!return_ADXL_ready()){
+		//wait time for caps to discharge
+		delayMs(2000);
+		initializeADXL362();
+		delayMs(1000);
+		#ifdef DEBUG
+		DEBUG_MESSAGE("*ACC not initialized successfully *\n");
+		#endif
+	}
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*ACC  initialized successfully *\n");
+	#endif
+
 	int16_t z = 0;
 	int16_t z_low = 0;
 	int16_t z_high = 0;
 	char messurementString[6];
 	//variable for iterations
 	int i;
+
+	redStartup();
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*DEWI module ready *\n");
+	#endif
+
+	//Erase comments to find out address of node
+/*
+	i = readModuleParams('S','H');
+	itoa(i,transmitString);
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*High Adress: *\n");
+	DEBUG_MESSAGE(transmitString);
+	DEBUG_MESSAGE("*\n");
+	#endif
+	i = readModuleParams('S','L');
+	itoa(i,transmitString);
+	#ifdef DEBUG
+	DEBUG_MESSAGE("*Low Adress: *\n");
+	DEBUG_MESSAGE(transmitString);
+	DEBUG_MESSAGE("*\n");
+	#endif
+*/
 
     while(1){
 
@@ -137,8 +186,9 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 {
 	if(EXTI_GetITStatus(EXTI_Line8) == SET){	//Handler for Button2 pin interrupt
 		state++;
-		if(state > 2)
+		if(state > 3)
 			state = 0;
+		RSSI_previouslySent = false;			//Be sure that always first RSSI packet sends 0
 		GPIOC->ODR = (1 << (state+6));			//State 0 -> ACC | State 1 -> RSSI | State 2 -> GPS
 		EXTI_ClearITPendingBit(EXTI_Line8);
 	}

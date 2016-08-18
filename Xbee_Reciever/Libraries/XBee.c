@@ -82,7 +82,7 @@ void queue1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1){
 }
 
 
-uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
+uint32_t  readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
 
 	uint32_t data = 0;
 	uint8_t cheksum = 0;
@@ -131,6 +131,7 @@ uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
 		#ifdef DEBUG
 		Usart1_SendString("*AT command read correct*\n");
 		#endif
+		readingPacket = false;
 		return data;
 	}
 	readingPacket = false;

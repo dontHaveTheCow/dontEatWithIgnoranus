@@ -17,7 +17,8 @@ void initializeRedLed2(void);
 void initializeRedLed3(void);
 void initializeRedLed4(void);
 void initializeRedLed5(void);
-//void delayGPIOs(int count);
+
+void turnOnGreenLed(uint8_t pin);
 
 void blinkGreenLed1(void);
 void blinkGreenLed2(void);
@@ -27,20 +28,10 @@ void blinkRedLed2(void);
 void blinkRedLed3(void);
 void blinkRedLed4(void);
 void blinkRedLed5(void);
-
-void turnOnGreenLed1(void);
-void turnOnGreenLed2(void);
-void turnOnGreenLed3(void);
-void turnOnRedLed1(void);
-void turnOnRedLed2(void);
-void turnOnRedLed3(void);
-void turnOnRedLed4(void);
-void turnOnRedLed5(void);
-
-void toggleRedLed5(void);
-
-void blinkIndicationLedTwice(void);
-void blinkIndicationLedThrice(void);
+void blinkAllRed(void);
+void turnOnRedLed(uint8_t pin);
+void blinkRedLed(uint8_t pin);
+void redStartup(void);
 
 #endif
 

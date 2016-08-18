@@ -36,6 +36,7 @@ bool readingPacket = false;
 struct node{
 	uint8_t adress[8];
 	int16_t measurment[3];	//0 -> ACC 1 -> RSSI 2 -> GPS
+	uint8_t tmpRSSI;
 	/*
 	 * state - 8 bit Config register
 	 * |SD|COM|NETWORK|---|---|GPS|RSSI|ACC|
@@ -70,6 +71,16 @@ int main(void)
 	node[0].adress[6] = 0x83;
 	node[0].adress[7] = 0xD9;
 	node[0].state = 0;
+
+	node[1].adress[0] = 0x00;
+	node[1].adress[1] = 0x13;
+	node[1].adress[2] = 0xA2;
+	node[1].adress[3] = 0x00;
+	node[1].adress[4] = 0x40;
+	node[1].adress[5] = 0xEA;
+	node[1].adress[6] = 0xEF;
+	node[1].adress[7] = 0xE9;
+	node[1].state = 0;
 
 	//Usart for debugging and communication
 	Usart1_Init(9600);
@@ -119,7 +130,6 @@ int main(void)
 	char stringOfMessurement[5];
 	//variables for RSSI detection
 	uint8_t RSSIdefaultCount = 0;
-	uint8_t RSSIdefaultValues[5];
 
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*Xbee initialized *\n");
@@ -129,9 +139,17 @@ int main(void)
 	InitialiseSPI2_GPIO();
 	InitialiseSPI2();
 	initializeADXL362();
+/*	while(!return_ADXL_ready()){
+		//wait time for caps to discharge
+		delayMs(3000);
+		initializeADXL362();
+		#ifdef DEBUG
+		DEBUG_MESSAGE("*ACC not initialized successfully *\n");
+		#endif
+	}*/
 
 	#ifdef DEBUG
-	DEBUG_MESSAGE("*Accelerometer initialized *\n");
+	DEBUG_MESSAGE("*ACC  initialized successfully *\n");
 	#endif
 
 	redStartup();
@@ -181,7 +199,7 @@ int main(void)
     			case RECIEVE_PACKET:
 
 					#ifdef DEBUG
-					DEBUG_MESSAGE("*RECIEVE_PACKET_API_FRAME received *\n");
+					DEBUG_MESSAGE("*RECIEVE_PACKET_API_FRAME*\n");
 					#endif
 
     				i = 1;	//Remember that "Frame type" byte was the first one
@@ -196,10 +214,10 @@ int main(void)
     				}
 
 					#ifdef DEBUG
-					DEBUG_MESSAGE("*Message recieved from ");
+					DEBUG_MESSAGE("*Node ");
 					//Works if there are less then 10 nodes
 					DEBUG_SEND_BYTE(currentNode+48);
-					DEBUG_MESSAGE(" node*\n");
+					DEBUG_MESSAGE("*\n");
 					#endif
 
     				//After reading source address, comes 2 reserved bytes
@@ -210,9 +228,15 @@ int main(void)
     				node[currentNode].state = receivePacket[i++] - 0x30;	//Calculate the integer from ASCII by subtracting 0x30
 
 					#ifdef DEBUG
-					DEBUG_MESSAGE("*Received ");
-					DEBUG_SEND_BYTE(node[currentNode].state+48);
-					DEBUG_MESSAGE(" measurement*\n");
+    				if(node[currentNode].state == 0){
+    					DEBUG_MESSAGE("*ACC measurement*\n");
+    				}
+    				else if(node[currentNode].state == 1){
+    					DEBUG_MESSAGE("*RSSI measurement*\n");
+    				}
+    				else{
+    					DEBUG_MESSAGE("*GPS measurement*\n");
+    				}
 					#endif
 
     				i++;
@@ -227,18 +251,28 @@ int main(void)
     				//printf("node:%d\tFriendState:%d\tdata:%d\n", currentNode, node[currentNode].state, node[currentNode].measurment[node[currentNode].state]);
 
 					#ifdef DEBUG
-					DEBUG_MESSAGE("*Measurement: ");
+					DEBUG_MESSAGE("*Value: ");
 					DEBUG_MESSAGE(stringOfMessurement);
 					DEBUG_MESSAGE("*\n");
 					#endif
 
-    				if(receiverNode.  state == node[currentNode].state){
+    				if(receiverNode.state == node[currentNode].state){
     					switch(receiverNode.state){
 							case 0:
 								receiverNode.measurment[0] = returnZ_axis();
 								//printf("My ACC:%d\n", receiverNode.measurment[0]);
 								//printf("ACC difference:%d\n",abs(receiverNode.measurment[0] - node[currentNode].measurment[0]));
-								if(abs(receiverNode.measurment[0] - node[currentNode].measurment[0]) < 50)
+
+/*
+								#ifdef DEBUG
+								itoa(receiverNode.measurment[0],stringOfMessurement);
+								DEBUG_MESSAGE("*My measurement: ");
+								DEBUG_MESSAGE(stringOfMessurement);
+								DEBUG_MESSAGE("*\n");
+								#endif
+*/
+
+								if(abs(receiverNode.measurment[0] - node[currentNode].measurment[0]) < 80)
 									turnOnRedLed(currentNode);
 								else
 									blinkRedLed(currentNode);
@@ -246,25 +280,35 @@ int main(void)
 							case 1:
 								if(node[currentNode].measurment[node[currentNode].state] == 0){ //gather the average RSSI from the first couple of RSSI packets
 									RSSIdefaultCount = 0;
+									node[currentNode].tmpRSSI = 0;
+									#ifdef DEBUG
+									DEBUG_MESSAGE("*Calculating average RSSI...*\n");
+									#endif
 								}
-								if(RSSIdefaultCount < 5){
-									RSSIdefaultValues[RSSIdefaultCount] = readModuleParams('D','B');
-									RSSIdefaultCount++;
-									blinkRedLed(currentNode);
-								}
-								if(RSSIdefaultCount == 5){
-									receiverNode.measurment[1]=(RSSIdefaultValues[0]+RSSIdefaultValues[1]+RSSIdefaultValues[2]+RSSIdefaultValues[3]+RSSIdefaultValues[4]) / 5;
-									RSSIdefaultCount++;
-								}
-								if(RSSIdefaultCount == 6){
-									node[currentNode].measurment[1] = readModuleParams('D','B');
-									if(abs(receiverNode.measurment[1] - node[currentNode].measurment[1]) < 5)
+								else if(RSSIdefaultCount == 5){
+									node[currentNode].measurment[node[currentNode].state] = readModuleParams('D','B') >> 24;
+									if(abs(node[currentNode].tmpRSSI - node[currentNode].measurment[node[currentNode].state]) < 5)
 										turnOnRedLed(currentNode);
 									else
 										blinkRedLed(currentNode);
+									#ifdef DEBUG
+									DEBUG_MESSAGE("*Average RSSI: ");
+									itoa(node[currentNode].tmpRSSI, stringOfMessurement);
+									DEBUG_MESSAGE(stringOfMessurement);
+									DEBUG_MESSAGE(" Received packet's RSSI: ");
+									itoa(node[currentNode].measurment[node[currentNode].state], stringOfMessurement);
+									DEBUG_MESSAGE(stringOfMessurement);
+									DEBUG_MESSAGE(" *\n");
+									#endif
 									//printf("Avarage RSSI:%d\n",receiverNode.measurment[1]);
 									//printf("Friends RSSI:%d\n",node[currentNode].measurment[1]);
-
+								}
+								else if(RSSIdefaultCount++ < 5){
+									/*
+									 * Remember that result is in little endian, so one byte result is stored as msb in 32 bit integer
+									 */
+									node[currentNode].tmpRSSI = (node[currentNode].tmpRSSI +  (readModuleParams('D','B') >> 24)) / 2;
+									blinkRedLed(currentNode);
 								}
 								break;
 							case 2:
@@ -274,17 +318,26 @@ int main(void)
     				}
     				else{
     					blinkRedLed(currentNode);
-    					//printf("Error in state compatibility \n");
+						#ifdef DEBUG
+						DEBUG_MESSAGE("*ERROR in State compability*\n");
+						#endif
     				}
     				dataUpdated = false;
     				break;
     			case MODEM_STATUS:
-    				blinkRedLed3();
+    				blinkAllRed();
+    				if(receivePacket[1] == 0x00){
+						#ifdef DEBUG
+						DEBUG_MESSAGE("*ModemStatus - Hardware reset*\n");
+						#endif
+    				}
     				dataUpdated = false;
-    				//printf("At MODEM_STATUS of switch:%d\n", receiverNode.state);
-    			default :
+					break;
+    			default:
     				//FUCK: There was another type of packet
-    				//printf("At DEFAULT of switch:%d\n", typeOfFrame);
+					#ifdef DEBUG
+					DEBUG_MESSAGE("*ERROR - unexpected packet*\n");
+					#endif
     				dataUpdated = false;
     				break;
     		}
@@ -339,6 +392,9 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 		if(receiverNode.state > 2)
 			receiverNode.state = 0;
 		GPIOC->ODR = (1 << (receiverNode.state+6));			//State 0 -> ACC | State 1 -> RSSI | State 2 -> GPS
+		#ifdef DEBUG
+		DEBUG_MESSAGE("*State changed*\n");
+		#endif
 		EXTI_ClearITPendingBit(EXTI_Line8);
 	}
 
