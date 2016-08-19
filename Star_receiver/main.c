@@ -38,7 +38,7 @@ struct node{
 	uint8_t adress[8];
 	int16_t measurment[3];	//0 -> ACC 1 -> RSSI 2 -> GPS
 	uint8_t tmpRSSI;
-	uint8_t errorByte;
+	uint8_t avarageRSSIcount;
 	/*
 	 * if there is an error, bit is set to 1
 	 * alarm will be called if there are more then 1 bit set (sum is
@@ -79,6 +79,8 @@ int main(void)
 	node[0].adress[6] = 0x83;
 	node[0].adress[7] = 0xD9;
 	node[0].state = 0;
+	node[0].errorByte = 0;
+	node[0].avarageRSSIcount = 0;
 
 	node[1].adress[0] = 0x00;
 	node[1].adress[1] = 0x13;
@@ -89,6 +91,8 @@ int main(void)
 	node[1].adress[6] = 0xEF;
 	node[1].adress[7] = 0xE9;
 	node[1].state = 0;
+	node[1].errorByte = 0;
+	node[1].avarageRSSIcount = 0;
 
 	//Usart for debugging and communication
 	Usart1_Init(9600);
@@ -115,6 +119,10 @@ int main(void)
 	//Turn on first status led ( ACC )
 	turnOnGreenLed(receiverNode.state);
 
+	//blink these 3 leds to indicate that gpio,usart and systick is initialzied
+	blinkRedLed1();
+	blinkRedLed2();
+	blinkRedLed3();
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*GPIO initialized *\n");
 	#endif
@@ -136,9 +144,8 @@ int main(void)
 	//variables for RECIEVE_PACKET
 	uint8_t currentNode;
 	char stringOfMessurement[5];
-	//variables for RSSI detection
-	uint8_t RSSIdefaultCount = 0;
 
+	blinkRedLed4();
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*Xbee initialized *\n");
 	#endif
@@ -147,19 +154,20 @@ int main(void)
 	InitialiseSPI2_GPIO();
 	InitialiseSPI2();
 	initializeADXL362();
-/*	while(!return_ADXL_ready()){
+	while(!return_ADXL_ready()){
 		//wait time for caps to discharge
-		delayMs(3000);
+		delayMs(2000);
 		initializeADXL362();
+		delayMs(1000);
+		blinkRedLed5();
 		#ifdef DEBUG
 		DEBUG_MESSAGE("*ACC not initialized successfully *\n");
 		#endif
-	}*/
-
+	}
+	blinkRedLed5();
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*ACC  initialized successfully *\n");
 	#endif
-
 	redStartup();
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*DEWI module ready *\n");
@@ -239,9 +247,6 @@ int main(void)
     				if(node[currentNode].state == 0){
     					DEBUG_MESSAGE("*ACC measurement*\n");
     				}
-    				else if(node[currentNode].state == 1){
-    					DEBUG_MESSAGE("*RSSI measurement*\n");
-    				}
     				else{
     					DEBUG_MESSAGE("*GPS measurement*\n");
     				}
@@ -264,41 +269,27 @@ int main(void)
 					DEBUG_MESSAGE("*\n");
 					#endif
 
-    				if(receiverNode.state == node[currentNode].state){
-    					switch(receiverNode.state){
+    					switch(node[currentNode].state){
 							case 0:
 								receiverNode.measurment[0] = returnZ_axis();
-								//printf("My ACC:%d\n", receiverNode.measurment[0]);
-								//printf("ACC difference:%d\n",abs(receiverNode.measurment[0] - node[currentNode].measurment[0]));
-
 /*
 								#ifdef DEBUG
 								itoa(receiverNode.measurment[0],stringOfMessurement);
-								DEBUG_MESSAGE("*My measurement: ");
+								DEBUG_MESSAGE("*My ACC: ");
 								DEBUG_MESSAGE(stringOfMessurement);
 								DEBUG_MESSAGE("*\n");
 								#endif
 */
-
 								if(abs(receiverNode.measurment[0] - node[currentNode].measurment[0]) < 80)
 									turnOnRedLed(currentNode);
-								else
+								else{
+									node[currentNode].errorByte |= 0x01;
 									blinkRedLed(currentNode);
-								break;
-							case 1:
-								if(node[currentNode].measurment[node[currentNode].state] == 0){ //gather the average RSSI from the first couple of RSSI packets
-									RSSIdefaultCount = 0;
-									node[currentNode].tmpRSSI = 0;
-									#ifdef DEBUG
-									DEBUG_MESSAGE("*Calculating average RSSI...*\n");
-									#endif
 								}
-								else if(RSSIdefaultCount == 5){
+								//well - after checked acc error, now check the rssi for that node
+								//if average is calculated, compare recent packet's rssi with average rssi
+								if(node[currentNode].avarageRSSIcount == 6){
 									node[currentNode].measurment[node[currentNode].state] = readModuleParams('D','B') >> 24;
-									if(abs(node[currentNode].tmpRSSI - node[currentNode].measurment[node[currentNode].state]) < 5)
-										turnOnRedLed(currentNode);
-									else
-										blinkRedLed(currentNode);
 									#ifdef DEBUG
 									DEBUG_MESSAGE("*Average RSSI: ");
 									itoa(node[currentNode].tmpRSSI, stringOfMessurement);
@@ -308,28 +299,58 @@ int main(void)
 									DEBUG_MESSAGE(stringOfMessurement);
 									DEBUG_MESSAGE(" *\n");
 									#endif
-									//printf("Avarage RSSI:%d\n",receiverNode.measurment[1]);
-									//printf("Friends RSSI:%d\n",node[currentNode].measurment[1]);
+									if(abs(node[currentNode].tmpRSSI - node[currentNode].measurment[node[currentNode].state]) < 5)
+										turnOnRedLed(currentNode);
+									else{
+										node[currentNode].errorByte |= 0x02;
+										blinkRedLed(currentNode);
+									}
 								}
-								else if(RSSIdefaultCount++ < 5){
-									/*
-									 * Remember that result is in little endian, so one byte result is stored as msb in 32 bit integer
-									 */
-									node[currentNode].tmpRSSI = (node[currentNode].tmpRSSI +  (readModuleParams('D','B') >> 24)) / 2;
-									blinkRedLed(currentNode);
+								//calculate average
+								else if(node[currentNode].avarageRSSIcount++ < 6){
+									node[currentNode].tmpRSSI = readModuleParams('D','B') >> 24;
+									#ifdef DEBUG
+									DEBUG_MESSAGE("*Calculating average RSSI...*\n");
+									#endif
 								}
 								break;
-							case 2:
-								blinkRedLed(currentNode);
+							case 1:
+
+								/*
+								 * read the gps value of receiver
+								 * compare it with received value from node
+								 * decide for errorByte 3lsb value
+								 */
+
+								//well - after checked gps error, now check the rssi for that node
+								//if average is calculated, compare recent packet's rssi with average rssi
+								if(node[currentNode].avarageRSSIcount == 6){
+									node[currentNode].measurment[node[currentNode].state] = readModuleParams('D','B') >> 24;
+									#ifdef DEBUG
+									DEBUG_MESSAGE("*Average RSSI: ");
+									itoa(node[currentNode].tmpRSSI, stringOfMessurement);
+									DEBUG_MESSAGE(stringOfMessurement);
+									DEBUG_MESSAGE(" Received packet's RSSI: ");
+									itoa(node[currentNode].measurment[node[currentNode].state], stringOfMessurement);
+									DEBUG_MESSAGE(stringOfMessurement);
+									DEBUG_MESSAGE(" *\n");
+									#endif
+									if(abs(node[currentNode].tmpRSSI - node[currentNode].measurment[node[currentNode].state]) < 5)
+										turnOnRedLed(currentNode);
+									else{
+										node[currentNode].errorByte |= 0x02;
+										blinkRedLed(currentNode);
+									}
+								}
+								//calculate average
+								else if(node[currentNode].avarageRSSIcount++ < 6){
+									node[currentNode].tmpRSSI = readModuleParams('D','B') >> 24;
+									#ifdef DEBUG
+									DEBUG_MESSAGE("*Calculating average RSSI...*\n");
+									#endif
+								}
 								break;
     					}
-    				}
-    				else{
-    					blinkRedLed(currentNode);
-						#ifdef DEBUG
-						DEBUG_MESSAGE("*ERROR in State compability*\n");
-						#endif
-    				}
     				dataUpdated = false;
     				break;
     			case MODEM_STATUS:
@@ -411,25 +432,34 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 
 		if(readingPacket == false){
 			errorTimer, cheksum = 0;
+			readingPacket = true;
 			GPIO_ResetBits(GPIOA,GPIO_Pin_4);
 			while(SPI1_TransRecieve(0x00) != 0x7E){	//Wait for start delimiter
-				if(errorTimer++ > ERROR_TIMER_COUNT)			//Exit loop if there is no start delimiter
-					return;
+				errorTimer++;
+				if(errorTimer > ERROR_TIMER_COUNT)			//Exit loop if there is no start delimiter
+					break;
 			}
-			readingPacket = true;
-			SPI1_TransRecieve(0x00);
-			length = SPI1_TransRecieve(0x00);
-			uint8_t i = 0;
-			for(; i < length; i ++ ){				//Read data based on packet length
-				receivePacket[i] = SPI1_TransRecieve(0x00);
-				cheksum += receivePacket[i];
+			if(errorTimer < ERROR_TIMER_COUNT){
+				SPI1_TransRecieve(0x00);
+				length = SPI1_TransRecieve(0x00);
+				uint8_t i = 0;
+				for(; i < length; i ++ ){				//Read data based on packet length
+					receivePacket[i] = SPI1_TransRecieve(0x00);
+					cheksum += receivePacket[i];
+				}
+				receivePacket[i] = '\0';
+				cheksum += SPI1_TransRecieve(0x00);
+				if(cheksum == 0xFF)
+					dataUpdated = true;					//Data is updated if checksum is true
+				readingPacket = false;
+				GPIO_SetBits(GPIOA,GPIO_Pin_4);
 			}
-			receivePacket[i] = '\0';
-			cheksum += SPI1_TransRecieve(0x00);
-			if(cheksum == 0xFF)
-				dataUpdated = true;					//Data is updated if checksum is true
-			readingPacket = false;
-			GPIO_SetBits(GPIOA,GPIO_Pin_4);
+			else{
+				readingPacket = false;
+				#ifdef DEBUG
+				DEBUG_MESSAGE("*There was timing error in reading interrupt data*\n");
+				#endif
+			}
 		}
 		EXTI_ClearITPendingBit(EXTI_Line4);
 	}
