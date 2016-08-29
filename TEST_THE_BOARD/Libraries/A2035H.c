@@ -29,7 +29,6 @@ void initializeA2035H(void){
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-
 	//Set reset pin
 	GPIO_ResetBits(GPIOC, GPS_RESET_PIN);
 	delayMs(200);
@@ -55,4 +54,10 @@ void hibernate_da_A2035H(void){
     GPIO_SetBits(GPIOF, ON_PIN);
     delayMs(200);
 	GPIO_ResetBits(GPIOF, ON_PIN);
+}
+
+void reset_da_A2035H(void){
+	GPIO_ResetBits(GPIOC, GPS_RESET_PIN);
+	delayMs(200);
+	GPIO_SetBits(GPIOC, GPS_RESET_PIN);
 }

@@ -13,5 +13,6 @@
 void initializeA2035H(void);
 void wake_da_A2035H(void);
 void hibernate_da_A2035H(void);
+void reset_da_A2035H(void);
 
 #endif

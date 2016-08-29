@@ -25,7 +25,7 @@ int DELAY = 50;
 
 int main(void){
 
-	initializeUserButton();;
+	initializeUserButton();
 	initializeGreenLed1();
 	initializeGreenLed2();
 	initializeGreenLed3();
@@ -43,6 +43,8 @@ int main(void){
 
 	//initializeA2035H();
 	//hibernate_da_A2035H();
+	//wake_da_A2035H();
+	//reset_da_A2035H();
 
 	GPIOB->ODR ^= GPIO_Pin_5;
 	GPIOB->ODR ^= GPIO_Pin_6;
@@ -84,7 +86,7 @@ int main(void){
     }
 }
 
-/*void USART1_IRQHandler(void){
+void USART1_IRQHandler(void){
 	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET){
 		//blink a led
     	GPIOB->ODR ^= GPIO_Pin_5;
@@ -103,7 +105,7 @@ int main(void){
 		else if(RxLenght == RXBUFFERSIZE)
 			RxLenght = 0;
 	}
-}*/
+}
 
 void USART2_IRQHandler(void){
 	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){

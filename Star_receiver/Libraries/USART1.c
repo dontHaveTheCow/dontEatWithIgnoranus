@@ -57,7 +57,7 @@ void Usart1_SendString(char* string){
 }
 
 char* Usart1_RecieveString(char* String){
-	while(*String != '/r'){
+	while(*String != '\r'){
 		while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
 		*String++ = USART_ReceiveData(USART1);
 	}

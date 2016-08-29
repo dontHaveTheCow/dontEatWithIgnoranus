@@ -28,10 +28,13 @@ static char recievePacket[64];
 static bool dataUpdeted = false;
 volatile uint8_t length;
 bool readingPacket = false;
+bool onOff = false;
+uint8_t state = 2;
 
 int main(void){
 
 	//Leds and buttons
+	initializeUserButton();
 	initializeGreenLed1();
 	initializeGreenLed2();
 	initializeGreenLed3();
@@ -60,7 +63,6 @@ int main(void){
 	InitialiseSPI1();
 	//SPI attention pin for incoming data alert
 	initializeXbeeATTnPin();
-	uint8_t state = 1;
 	char transmitString[8];
 
 	blinkRedLed4();
@@ -93,7 +95,6 @@ int main(void){
 	char messurementString[6];
 	//variable for iterations
 	int i;
-
 	redStartup();
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*DEWI module ready *\n");
@@ -117,44 +118,57 @@ int main(void){
 	#endif
 */
 
+
     while(1){
-    	delayMs(500);
-    	switch(state++){
-    	//Transmit acc data
-			case 0:
-				getZ(&z,&z_low,&z_high);
-				itoa(z, messurementString);
-				transmitString[0] = '0';
-				transmitString[1] = ' ';
-				for(i = 2; i < sizeof(transmitString); i++){
-					transmitString[i] = messurementString[i-2];
-				}
-				transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
-				#ifdef DEBUG
-				DEBUG_MESSAGE("*String sent: ");
-				DEBUG_MESSAGE(transmitString);
-				DEBUG_MESSAGE("*\n");
-				#endif
-				blinkGreenLed1();
-				break;
-		//Transmit gps data
-			case 1:
-				strcpy(transmitString, "1 1234");
-				transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
-				#ifdef DEBUG
-				DEBUG_MESSAGE("*String sent: ");
-				DEBUG_MESSAGE(transmitString);
-				DEBUG_MESSAGE("*\n");
-				#endif
-				blinkGreenLed2();
-				state = 0;
-				break;
-    	}
-    }
-}
+        	delayMs(800);
+        	switch(state){
+        	//Transmit acc data
+    			case 0:
+    				getZ(&z,&z_low,&z_high);
+    				itoa(z, messurementString);
+    				transmitString[0] = '0';
+    				transmitString[1] = ' ';
+    				for(i = 2; i < sizeof(transmitString); i++){
+    					transmitString[i] = messurementString[i-2];
+    				}
+    				transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+    				#ifdef DEBUG
+    				DEBUG_MESSAGE("*String sent: ");
+    				DEBUG_MESSAGE(transmitString);
+    				DEBUG_MESSAGE("*\n");
+    				#endif
+    				blinkGreenLed1();
+    				state++;
+    				break;
+    		//Transmit gps data
+    			case 1:
+    				strcpy(transmitString, "1 1234");
+    				transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+    				#ifdef DEBUG
+    				DEBUG_MESSAGE("*String sent: ");
+    				DEBUG_MESSAGE(transmitString);
+    				DEBUG_MESSAGE("*\n");
+    				#endif
+    				blinkGreenLed2();
+    				state = 0;
+    				break;
+    			case 2:
+    				redStartup();
+    				break;
+        	}
+   		}
+  }
 
 void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 {
+	if(EXTI_GetITStatus(EXTI_Line8) == SET){	//Handler for Button2 pin interrupt
+		if(state < 2 )
+			state = 2;
+		else
+			state = 0;
+		EXTI_ClearITPendingBit(EXTI_Line8);
+	}
+
 	if(EXTI_GetITStatus(EXTI_Line4) == SET){	//Handler for Radio ATTn pin interrupt
 
 		if(!readingPacket){
