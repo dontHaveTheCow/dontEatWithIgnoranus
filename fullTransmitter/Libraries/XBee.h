@@ -16,7 +16,6 @@
 #include <string.h>
 
 //These are the Defines and global variables
-
 #define TRANSOPT_DISACK 0x00
 #define TRANSOPT_DIGIMESH 0xC0
 extern bool readingPacket;

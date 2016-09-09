@@ -14,8 +14,6 @@
 #include "SysTickDelay.h"
 
 //These are the Define statements
-#define SDSELECT()      GPIOB->BRR = (1<<1)  // pin low, MMC CS = L
-#define SDDESELECT()    GPIOB->BSRR = (1<<1) // pin high,MMC CS = H
 
 #define DATA_TOKEN		0xFE				 /* Single/multiple block read or single-block write*/
 #define SECTOR_OFFSET	0x2000				 /* Sector counting starts from offset 0x2000*/
@@ -99,8 +97,6 @@ uint8_t findSectorToWrite(uint32_t filesize);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
 //uint32_t writeLastSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
 uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
-void appendTextToTheEndOfFileBuffer(char* text, char endSymbol, uint16_t currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
-
 
 
 //String functions

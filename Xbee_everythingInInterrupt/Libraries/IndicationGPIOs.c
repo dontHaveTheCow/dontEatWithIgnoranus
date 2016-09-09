@@ -1,7 +1,7 @@
 #include "IndicationGPIOs.h"
 #include "SysTickDelay.h"
 
-#define DELAY 20
+#define DELAY 5
 #define SLOW_DELAY 50
 #define REAL_SLOW_DELAY 100
 
@@ -182,7 +182,10 @@ void blinkRedLed(uint8_t pin){
 	delayMs(DELAY);
 }
 
-
+void xorRedLed(uint8_t pin){
+	//5 to 9
+	GPIOB->ODR ^= (1 << (5+pin));
+}
 
 void blinkGreenLed1(void){
 		GPIOC->ODR |= GPIO_Pin_6;
@@ -229,4 +232,11 @@ void redStartup(void){
 	}
 }
 
+void xorGreenLed1(void){
+	GPIOC->ODR ^= GPIO_Pin_6;
+}
+
+void xorRedLed1(void){
+	GPIOB->ODR ^= GPIO_Pin_5;
+}
 

@@ -7,7 +7,10 @@
 #include <stm32f0xx_rcc.h>
 
 //These are the Define statements
-#define DELAY 100
+#define DELAY 20
+#define SLOW_DELAY 50
+#define REAL_SLOW_DELAY 100
+#define REAL_REAL_SLOW_DELAY 200
 
 //These are the prototypes for the routines
 void initializeGreenLed1(void);
@@ -18,12 +21,10 @@ void initializeRedLed2(void);
 void initializeRedLed3(void);
 void initializeRedLed4(void);
 void initializeRedLed5(void);
-void initializeDiscoveryLeds(void);
-void xorDiscoveryGreen(void);
-void xorDiscoveryBlue(void);
-void xorGreenLed1(void);
-void xorRedLed1(void);
+void initializeEveryRedLed(void);
+void initializeEveryGreenLed(void);
 
+void turnOnGreenLed(uint8_t pin);
 
 void blinkGreenLed1(void);
 void blinkGreenLed2(void);
@@ -33,19 +34,16 @@ void blinkRedLed2(void);
 void blinkRedLed3(void);
 void blinkRedLed4(void);
 void blinkRedLed5(void);
-
-void turnOnGreenLed1(void);
-void turnOnGreenLed2(void);
-void turnOnGreenLed3(void);
-void turnOnRedLed1(void);
-void turnOnRedLed2(void);
-void turnOnRedLed3(void);
-void turnOnRedLed4(void);
-void turnOnRedLed5(void);
-
-void blinkIndicationLedTwice(void);
-void blinkIndicationLedThrice(void);
+void blinkAllRed(void);
+void turnOnRedLed(uint8_t pin);
+void blinkRedLed(uint8_t pin);
+void redStartup(int delay);
+void redGreenStartup(void);
+void amazingRedGreenStartup(void);
+void xorGreenLed1(void);
+void xorRedLed1(void);
+void turnOnGreenLeds(uint8_t pin);
+void blinkGreenLeds(uint8_t pin);
 
 #endif
-
 

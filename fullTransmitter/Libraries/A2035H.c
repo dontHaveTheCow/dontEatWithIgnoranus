@@ -49,7 +49,7 @@ void setupGpsGpio(void){
 
 //RCC_APB1Periph_TIM3 is used for speaker pwm - dont use that!!!
 //okkk i will use RCC_APB1Periph_TIM2
-void setupGpsTimer(void){
+/*void setupGpsTimer(void){
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 	TIM_TimeBaseInitTypeDef Timer_init_structure;
 	Timer_init_structure.TIM_CounterMode = TIM_CounterMode_Up;
@@ -69,4 +69,4 @@ void setupGpsTimerInterrupt(void){
 	NVIC_Init(&NVIC_structure);
 	//TIM_Cmd(TIM2,ENABLE);
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-}
+}*/

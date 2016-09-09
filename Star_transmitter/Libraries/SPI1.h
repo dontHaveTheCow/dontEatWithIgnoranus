@@ -9,7 +9,11 @@
 #include <stm32f0xx_misc.h>
 
 //These are the Define statements
-
+//These are the Define statements
+#define XBEE_CS_LOW() GPIO_ResetBits(GPIOA,GPIO_Pin_4)
+#define XBEE_CS_HIGH() GPIO_SetBits(GPIOA,GPIO_Pin_4)
+#define SDSELECT()      GPIOB->BRR = (1<<1)  // pin low, MMC CS = L
+#define SDDESELECT()    GPIOB->BSRR = (1<<1) // pin high,MMC CS = H
 
 //These are the prototypes for the routines
 void InitialiseSPI1_GPIO(void);

@@ -18,6 +18,7 @@
 #include "Button.h"
 #include "USART1.h"
 #include "PWM.h"
+#include "sdCard.h"
 
 //Xbee packet Defines
 #define AT_COMMAND_RESPONSE 0x88
@@ -34,6 +35,12 @@ static char receivePacket[128];
 volatile bool dataUpdated = false;
 volatile uint8_t length,errorTimer,cheksum;
 bool readingPacket = false;
+
+//sd globals
+//sd status
+//last bit - on/off
+//7th bit - writing, idle
+volatile uint8_t sdStatus = 0x01;
 
 struct node{
 	uint8_t adress[8];
@@ -137,16 +144,13 @@ int main(void)
 	initializeRedLed4();
 	initializeRedLed5();
 	//Turn on first status led ( ACC )
-	turnOnGreenLed(receiverNode.state);
+	//turnOnGreenLed(receiverNode.state);
 
 	InitializePwmPin();
 	InitializeTimer();
 	InitializePwm();
 
-	//blink these 3 leds to indicate that gpio,pwm,usart and systick is initialzied
 	blinkRedLed1();
-	blinkRedLed2();
-	blinkRedLed3();
 
 	//Xbee (radio)
 	InitialiseSPI1_GPIO();
@@ -191,8 +195,7 @@ int main(void)
 	}
 	else
 	readingPacket = false;
-
-	blinkRedLed4();
+	blinkRedLed2();
 
 	//ADXL362Z (acc)
 	InitialiseSPI2_GPIO();
@@ -203,10 +206,43 @@ int main(void)
 		delayMs(2000);
 		initializeADXL362();
 		delayMs(1000);
+		blinkRedLed3();
+	}
+
+	//initialize gps
+	blinkRedLed4();
+
+	//initialize sdCard
+	blinkRedLed5();
+	uint8_t sdBuffer[512];
+	uint16_t sdBufferCounter = 0;
+	uint8_t sector;
+	uint32_t mstrDir;
+	uint32_t cluster;
+	uint32_t filesize;
+	uint16_t fatSect, fsInfoSector;
+	char sdTmpWriteString[20];
+
+	errorTimer = 10;
+
+	while(!initializeSD() && errorTimer-- > 1){
+		delayMs(200);
 		blinkRedLed5();
 	}
-	redStartup();
+	if(!errorTimer)
+		sdStatus = 0x00;
+	else{
+		findDetailsOfFAT(sdBuffer,&fatSect,&mstrDir, &fsInfoSector);
 
+		findDetailsOfFile("LOGFILE",sdBuffer,mstrDir,&filesize,&cluster,&sector);
+
+		findLastClusterOfFile("LOGFILE",sdBuffer, &cluster,fatSect,mstrDir);
+
+		if(filesize < 512)
+			filesize = 512;
+	}
+
+	redStartup();
 	while(1)
     {
     	if(dataUpdated == true){
@@ -222,15 +258,158 @@ int main(void)
     		        if(receivePacket[2] == 'D' && receivePacket[3] == 'B'){
     		        	if(node[frameID-1].avarageRSSIcount == 6){
     		        		node[frameID-1].measurment[node[frameID-1].state] = receivePacket[5];
+    		        			//Check if measurement is in the threshold boundaries
     		        			if(abs(node[frameID-1].tmpRSSI - node[frameID-1].measurment[node[frameID-1].state]) > 10)
     		        				node[frameID-1].errorByte |= 0x02;
+    		        				//add sd card code for rssi messurement and alarm
+									if(sdStatus){
+										//add sd card code only for rssi messurement
+										sdTmpWriteString[0] = 'N';
+										sdTmpWriteString[1] = 'o';
+										sdTmpWriteString[2] = 'd';
+										sdTmpWriteString[3] = 'e';
+										sdTmpWriteString[4] = ' ';
+										sdTmpWriteString[5] = frameID - 1 + 0x30;
+										sdTmpWriteString[6] = ' ';
+										sdTmpWriteString[7] = 'D';
+										sdTmpWriteString[8] = 'N';
+										sdTmpWriteString[9] = 'G';
+										sdTmpWriteString[10] = 'R';
+										sdTmpWriteString[11] = 'S';
+										sdTmpWriteString[12] = 'S';
+										sdTmpWriteString[13] = 'I';
+										sdTmpWriteString[14] = ':';
+										sdTmpWriteString[15] = (receivePacket[5] / 10) + 0x30;
+										sdTmpWriteString[16] = (receivePacket[5] % 10) + 0x30;
+										sdTmpWriteString[17] = '\0';
+										//Firstly check if you wont overwrite the buffer
+										if((sdBufferCounter + strlen(&sdTmpWriteString[0]) + 1) > 512){
+											//if there is not enough space for next entry, write it to tmp-buffer and then to next sector
+											//need to add code to fill the whole sector
+											while(sdBufferCounter < 512){
+												sdBuffer[sdBufferCounter++] = ' ';
+											}
+											sdStatus |= 0x02;
+											writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+											sdStatus &= 0x01;
+											sdBufferCounter = 0;
+											strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+											sdBufferCounter += strlen(&sdTmpWriteString[0]);
+											sdBuffer[sdBufferCounter++] = '\n';
+										}
+										else{
+											strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+											sdBufferCounter += strlen(&sdTmpWriteString[0]);
+											sdBuffer[sdBufferCounter++] = '\n';
+
+											if(sdBufferCounter == 512){
+													sdStatus |= 0x02;
+													writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+													sdStatus &= 0x01;
+													sdBufferCounter = 0;
+											}
+										}
+									}
     		        			else {
     		        				node[frameID-1].errorByte &= 0x01;
+    		        				if(sdStatus){
+        		        				//add sd card code only for rssi messurement
+        		        				sdTmpWriteString[0] = 'N';
+        		        				sdTmpWriteString[1] = 'o';
+        		        				sdTmpWriteString[2] = 'd';
+        		        				sdTmpWriteString[3] = 'e';
+        		        				sdTmpWriteString[4] = ' ';
+        		        				sdTmpWriteString[5] = frameID -1 + 0x30;
+        		        				sdTmpWriteString[6] = ' ';
+        		        				sdTmpWriteString[7] = 'R';
+        		        				sdTmpWriteString[8] = 'S';
+        		        				sdTmpWriteString[9] = 'S';
+        		        				sdTmpWriteString[10] = 'I';
+        		        				sdTmpWriteString[11] = ':';
+										sdTmpWriteString[12] = (receivePacket[5] / 10) + 0x30;
+										sdTmpWriteString[13] = (receivePacket[5] % 10) + 0x30;
+        		        				sdTmpWriteString[14] = '\0';
+    		        					//Firstly check if you wont overwrite the buffer
+    		        					if((sdBufferCounter + strlen(&sdTmpWriteString[0]) + 1) > 512){
+    		        						//if there is not enough space for next entry, write it to tmp-buffer and then to next sector
+    		        						//need to add code to fill the whole sector
+    		        		                while(sdBufferCounter < 512){
+    		        		                    sdBuffer[sdBufferCounter++] = ' ';
+    		        		                }
+											sdStatus |= 0x02;
+											writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+											sdStatus &= 0x01;
+    		        		                sdBufferCounter = 0;
+    		            					strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+    		            					sdBufferCounter += strlen(&sdTmpWriteString[0]);
+    		            					sdBuffer[sdBufferCounter++] = '\n';
+    		        					}
+    		        					else{
+    		            					strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+    		            					sdBufferCounter += strlen(&sdTmpWriteString[0]);
+    		            					sdBuffer[sdBufferCounter++] = '\n';
+
+    		              					if(sdBufferCounter == 512){
+													sdStatus |= 0x02;
+													writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+													sdStatus &= 0x01;
+    		                						sdBufferCounter = 0;
+
+    		                				}
+    		        					}
+    		           				}
 								}
     		        		}
     		        	//calculate average
     		        	else if(node[frameID-1].avarageRSSIcount++ < 6){
     		        		node[frameID-1].tmpRSSI = receivePacket[5];
+	        				if(sdStatus){
+		        				//add sd card code only for rssi messurement
+		        				sdTmpWriteString[0] = 'N';
+		        				sdTmpWriteString[1] = 'o';
+		        				sdTmpWriteString[2] = 'd';
+		        				sdTmpWriteString[3] = 'e';
+		        				sdTmpWriteString[4] = ' ';
+		        				sdTmpWriteString[5] = frameID -1 + 0x30;
+		        				sdTmpWriteString[6] = ' ';
+		        				sdTmpWriteString[7] = 'A';
+		        				sdTmpWriteString[8] = 'V';
+		        				sdTmpWriteString[9] = 'R';
+		        				sdTmpWriteString[10] = 'S';
+		        				sdTmpWriteString[11] = 'S';
+		        				sdTmpWriteString[12] = 'I';
+		        				sdTmpWriteString[13] = ':';
+								sdTmpWriteString[14] = (receivePacket[5] / 10) + 0x30;
+								sdTmpWriteString[15] = (receivePacket[5] % 10) + 0x30;
+		        				sdTmpWriteString[16] = '\0';
+	        					//Firstly check if you wont overwrite the buffer
+	        					if((sdBufferCounter + strlen(&sdTmpWriteString[0]) + 1) > 512){
+	        						//if there is not enough space for next entry, write it to tmp-buffer and then to next sector
+	        						//need to add code to fill the whole sector
+	        		                while(sdBufferCounter < 512){
+	        		                    sdBuffer[sdBufferCounter++] = ' ';
+	        		                }
+									sdStatus |= 0x02;
+									writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+									sdStatus &= 0x01;
+	        		                sdBufferCounter = 0;
+	            					strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+	            					sdBufferCounter += strlen(&sdTmpWriteString[0]);
+	            					sdBuffer[sdBufferCounter++] = '\n';
+	        					}
+	        					else{
+	            					strcpy((char*)(&sdBuffer[sdBufferCounter]),&sdTmpWriteString[0]);
+	            					sdBufferCounter += strlen(&sdTmpWriteString[0]);
+	            					sdBuffer[sdBufferCounter++] = '\n';
+
+	              					if(sdBufferCounter == 512){
+											sdStatus |= 0x02;
+											writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+											sdStatus &= 0x01;
+	                						sdBufferCounter = 0;
+	                				}
+	        					}
+	           				}
     		        	}
     		        }
     		        else{
@@ -254,7 +433,7 @@ int main(void)
     				for(n = 0; n < NUMBER_OF_NODES; n++){	//Find the matching node for the received address
     					if(memcmp(&eightByteSourceAdress[4],&node[n].adress[4], 4) == 0 )
     						tmpNode = n;
-}
+    				}
 
     				//After reading source address, comes 2 reserved bytes
     				i = i + 2;
@@ -280,8 +459,38 @@ int main(void)
 
 								if(abs(receiverNode.measurment[0] - node[tmpNode].measurment[0]) > 80)
 									node[tmpNode].errorByte |= 0x01;
+
+									//add sd card accelerometer error code
 								else {
 									node[tmpNode].errorByte &= 0x02;
+									//add sd card accelerometer  code
+/*				    				if(sdStatus){
+				    					//Firstly check if you wont overwrite the buffer
+				    					if((sdBufferCounter + strlen(&stringOfMessurement[0]) + 1) > 512){
+				    						//if there is not enough space for next entry, write it to tmp-buffer and then to next sector
+				    						//need to add code to fill the whole sector
+				    		                while(sdBufferCounter < 512){
+				    		                    sdBuffer[sdBufferCounter++] = ' ';
+				    		                }
+				    		                writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+				    		                sdBufferCounter = 0;
+				        					strcpy((char*)(&sdBuffer[sdBufferCounter]),&stringOfMessurement[0]);
+				        					sdBufferCounter += strlen(&stringOfMessurement[0]);
+				        					sdBuffer[sdBufferCounter++] = ' ';
+				    					}
+				    					else{
+				        					strcpy((char*)(&sdBuffer[sdBufferCounter]),&stringOfMessurement[0]);
+				        					sdBufferCounter += strlen(&stringOfMessurement[0]);
+				        					sdBuffer[sdBufferCounter++] = ' ';
+
+				          					if(sdBufferCounter == 512){
+				            						xorGreenLed1();
+				            						writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
+				            						sdBufferCounter = 0;
+				            						xorGreenLed1();
+				            				}
+				    					}
+				       				}*/
 								}
 								//after receiving acc measurement, ask module for last packets rssi
 								askModuleParams('D','B',tmpNode+1);
@@ -356,9 +565,17 @@ int main(void)
 
 void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 {
+	if(EXTI_GetITStatus(EXTI_Line8) == SET){	//Handler for Button2 pin interrupt
+
+		turnOnGreenLed(0);
+		sdStatus &= 0x02;
+		goToIdleState();
+		EXTI_ClearITPendingBit(EXTI_Line8);
+	}
+
 	if(EXTI_GetITStatus(EXTI_Line4) == SET){	//Handler for Radio ATTn pin interrupt (data ready indicator)
 
-		if(readingPacket == false){
+		if(readingPacket == false && (sdStatus&0x02) == 0x00){
 			errorTimer, cheksum = 0;
 			readingPacket = true;
 			GPIO_ResetBits(GPIOA,GPIO_Pin_4);

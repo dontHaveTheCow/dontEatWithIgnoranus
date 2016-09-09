@@ -7,6 +7,7 @@
 #include <stm32f0xx_rcc.h>
 
 //These are the Define statements
+#define XOR_RED_LED(pin) {GPIOB->ODR ^= (1 << (5+pin));}
 
 //These are the prototypes for the routines
 void initializeGreenLed1(void);
@@ -31,7 +32,10 @@ void blinkRedLed5(void);
 void blinkAllRed(void);
 void turnOnRedLed(uint8_t pin);
 void blinkRedLed(uint8_t pin);
+void xorRedLed(uint8_t pin);
 void redStartup(void);
+void xorGreenLed1(void);
+void xorRedLed1(void);
 
 #endif
 

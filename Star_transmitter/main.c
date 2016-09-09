@@ -64,6 +64,12 @@ int main(void){
 	//SPI attention pin for incoming data alert
 	initializeXbeeATTnPin();
 	char transmitString[8];
+	uint8_t errorTimer = 10;
+	XBEE_CS_LOW();
+	while(errorTimer--){
+		SPI1_TransRecieve(0x00);
+	}
+	XBEE_CS_HIGH();
 
 	blinkRedLed4();
 	#ifdef DEBUG
@@ -100,24 +106,29 @@ int main(void){
 	DEBUG_MESSAGE("*DEWI module ready *\n");
 	#endif
 
-	//Erase comments to find out address of node
 /*
+	//Erase comments to find out address of node
 	i = readModuleParams('S','H');
 	itoa(i,transmitString);
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*High Adress: *\n");
-	DEBUG_MESSAGE(transmitString);
+	DEBUG_SEND_BYTE(i);
+	DEBUG_SEND_BYTE(i >> 8);
+	DEBUG_SEND_BYTE(i >> 16);
+	DEBUG_SEND_BYTE(i >> 24);
 	DEBUG_MESSAGE("*\n");
 	#endif
 	i = readModuleParams('S','L');
 	itoa(i,transmitString);
 	#ifdef DEBUG
 	DEBUG_MESSAGE("*Low Adress: *\n");
-	DEBUG_MESSAGE(transmitString);
+	DEBUG_SEND_BYTE(i);
+	DEBUG_SEND_BYTE(i >> 8);
+	DEBUG_SEND_BYTE(i >> 16);
+	DEBUG_SEND_BYTE(i >> 24);
 	DEBUG_MESSAGE("*\n");
 	#endif
 */
-
 
     while(1){
         	delayMs(800);

@@ -9,7 +9,7 @@
 #include "myStringFunctions.h"
 
 //debugging
-//#include "debug.h"
+#include "debug.h"
 
 //Device libraries
 #include "ADXL362.h"

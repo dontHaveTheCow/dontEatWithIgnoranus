@@ -234,7 +234,7 @@ uint8_t findDetailsOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir, uint
 	uint8_t directoryCount = 0;
 	delayMs(1);
 	while(!read_datablock(buff,_mstrDir));
-	delayMs(1 );
+	delayMs(1);
 	while(!startsWith(filename,(char*)buff)){
 		//Each byte directory is 32 bytes long
 		//If Short Filename doesn't match, jump to next directory
@@ -594,12 +594,8 @@ uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *file
 		*sector = 0;
 		*cluster = allocateNewCluster(writeBuff,fatSect,*cluster);
 	}
+
 	return 1;
-}
-
-void appendTextToTheEndOfFileBuffer(char* text, char endSymbol, uint16_t currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector){
-
-
 }
 
 uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){

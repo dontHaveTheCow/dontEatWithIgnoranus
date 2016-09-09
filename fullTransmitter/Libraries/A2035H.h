@@ -6,7 +6,7 @@
 #include <stm32f0xx_gpio.h>
 #include <stm32f0xx_rcc.h>
 #include "SysTickDelay.h"
-#include <stm32f0xx_tim.h>
+//#include <stm32f0xx_tim.h>
 #include <stm32f0xx_misc.h>
 
 //These are the Define statements
@@ -18,7 +18,7 @@
 void turnGpsOn(void);
 void hibernateGps(void);
 void setupGpsGpio(void);
-void setupGpsTimer(void);
-void setupGpsTimerInterrupt(void);
+//void setupGpsTimer(void);
+//void setupGpsTimerInterrupt(void);
 
 #endif

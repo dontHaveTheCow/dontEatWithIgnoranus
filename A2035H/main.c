@@ -22,20 +22,21 @@ volatile bool gpsDataUpdated = false;
 
 int main(void)
 {
-	char *gpsMessageParser;
-    char ts[16] = " ";
-    char lat[16] = " ";
+	char* ptr;
+	char* tmpPtr;
+    char ts[11] = " ";
+    char lat[11] = " ";
     char latd[2]= " ";
-    char lon[16]= " ";
+    char lon[11]= " ";
     char lond[2]= " ";
     char fix[2]= " ";
-    char sats[4]= " ";
+    char sats[3]= " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
 
 
 	//Clock for GPS
-	initializeGpsGpio();
+	setupGpsGpio();
 	initialiseSysTick();
 	initializeRedLed1();
 	initializeGreenLed1();
@@ -44,6 +45,8 @@ int main(void)
 	Usart2_Init(BAUD_4800);
 	Usart1_Init(BAUD_9600);
 	ConfigureUsart2Interrupt();
+	setupGpsTimer();
+	setupGpsTimerInterrupt();
 
 	turnGpsOn();
 	gpsIsOn = true;
@@ -51,28 +54,30 @@ int main(void)
 
     while(1){
     	if(gpsDataUpdated){
-    		Usart1_SendString(gpsReceiveString);
     		gpsDataUpdated = false;
     		messageIterator = 0;
-    		*gpsMessageParser = &gpsReceiveString[6];
+    		ptr = &gpsReceiveString[6];
     	    for(; messageIterator < 7; messageIterator ++){
-    	        while(*gpsMessageParser++ != ','){
-    	            *ptrToNMEA[messageIterator]++ = *(gpsMessageParser-1);
+    	    	tmpPtr = ptrToNMEA[messageIterator];
+    	        while(*ptr++ != ','){
+    	            *ptrToNMEA[messageIterator]++ = *(ptr-1);
     	        }
+    	        ptrToNMEA[messageIterator] = tmpPtr;
     	    }
-/*    		Usart1_SendString(ts);
-    		Usart1_Send('\n');
-    		Usart1_SendString(lat);
-    		Usart1_Send('\n');
-    		Usart1_SendString(lat);
-    		Usart1_Send('\n');
-    		Usart1_SendString(latd);
-    		Usart1_Send('\n');
-    		Usart1_SendString(lon);
-    		Usart1_Send('\n');
-    		Usart1_SendString(lond);
-    		Usart1_Send('\n');*/
+    	    if(fix[0] == '0'){
+        		Usart1_SendString(ts);
+        		Usart1_SendString(" No GPS fix\r\n");
+    	    }
+    	    else{
+        		Usart1_SendString(gpsReceiveString);
+        		Usart1_Send('\r');
+        		Usart1_Send('\n');
+    	    }
+    	    TIM_Cmd(TIM2,ENABLE);
+    	    GPIOC->ODR ^= GPIO_Pin_6;
     	}
+    	if(!gpsIsOn)
+    		hibernateGps();
     }
 }
 
@@ -101,9 +106,10 @@ void USART2_IRQHandler(void){
 			gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2);
 			if(gpsReceiveString[gpsReadIterator-1] == 0x0D){
 				gpsDataUpdated = true;
-				gpsReceiveString[gpsReadIterator] = '\0';
+				gpsReceiveString[gpsReadIterator-1] = '\0';
 				readingNMEA = false;
 				readingGPGGA = false;
+				USART_Cmd(USART2, DISABLE);
 			}
 		}
 		else if(readingNMEA == true){
@@ -123,4 +129,17 @@ void USART2_IRQHandler(void){
 		}
 
 	}
+}
+
+void TIM2_IRQHandler()
+{
+	if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
+	{
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+      	GPIOC->ODR ^= GPIO_Pin_6;
+      	TIM_Cmd(TIM2,DISABLE);
+      	USART_Cmd(USART2, ENABLE);
+	}
+
+
 }
