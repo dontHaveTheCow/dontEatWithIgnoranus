@@ -99,7 +99,7 @@ uint8_t findSectorToWrite(uint32_t filesize);
 uint32_t writeFileSize(uint8_t *buff, char* filename, uint32_t sizeInBytes, uint32_t _mstrDir);
 //uint32_t writeLastSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t _mstrDir, uint16_t _fatSect);
 uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
-void appendTextToTheEndOfFileBuffer(char* text, char endSymbol, uint16_t currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
+void appendTextToTheSD(char* text, char endofLineSymbol, uint16_t *currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector);
 
 
 

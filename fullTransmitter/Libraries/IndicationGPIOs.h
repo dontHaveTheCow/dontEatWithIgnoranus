@@ -44,6 +44,8 @@ void xorGreenLed1(void);
 void xorRedLed1(void);
 void turnOnGreenLeds(uint8_t pin);
 void blinkGreenLeds(uint8_t pin);
+void xorGreenLed(uint8_t pin);
+void batteryIndicationStartup(uint16_t voltageLevel);
 
 #endif
 

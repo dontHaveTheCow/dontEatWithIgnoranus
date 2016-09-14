@@ -11,42 +11,41 @@
 #define RXBUFFERSIZE 0x20
 #define TXBUFFERSIZE 0x20
 
-#define Toggle_green_led() GPIOC->ODR ^= GPIO_Pin_9;
-#define Toggle_blue_led()  GPIOC->ODR ^= GPIO_Pin_8;
+#define Toggle_green_led() GPIOC->ODR ^= GPIO_Pin_6;
 
 uint8_t RxBuffer[RXBUFFERSIZE];
 uint8_t TxBuffer[TXBUFFERSIZE];
 uint8_t RxLenght = 0;
 bool stringRecieved;
-uint8_t ADC_value;
+uint16_t ADC_value;
 char value_of_adc[4];
 
 int main(void){
 
 	//Initialize board
 	initialiseSysTick();
-	initializeDiscoveryLeds();
+	initializeGreenLed1();
 	//Initialize UART
 	Usart1Init(BAUD_9600);
 	ConfigureUsart1Interrupt();
 	//Initialize ADC
 	adcConfig();
-	adcInterruptConfig();
 
 	//Indicate startup
 	Toggle_green_led();
 	delayMs(100);
-	Toggle_blue_led();
+	Toggle_green_led();
 	delayMs(100);
 	Toggle_green_led();
 	delayMs(100);
-	Toggle_blue_led();
+	Toggle_green_led();
 	delayMs(100);
 
     while(1){
-    	Toggle_green_led();
-    	Toggle_blue_led();
-    	//ADC_value = (ADC_value * 33) / 256;
+
+    	ADC_value = (ADC_GetConversionValue(ADC1));
+    	//Calculating input voltage
+    	ADC_value = (ADC_value * 330) / 128;
     	itoa(ADC_value, value_of_adc);
     	Usart1SendString(value_of_adc);
     	Usart1SendString("\n");
@@ -77,14 +76,7 @@ void USART1_IRQHandler(void)
 	}
 }
 
-void ADC1_COMP_IRQHandler(void)
-{
-	if (ADC_GetITStatus(ADC1,ADC_IT_EOC) != RESET  )
-	{
-	ADC_value = (ADC_GetConversionValue(ADC1) / 4095.)* 3300;
-	ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
-	}
-}
+
 
 
 

@@ -312,5 +312,59 @@ void blinkGreenLeds(uint8_t pin){
 	delayMs(REAL_REAL_SLOW_DELAY);
 }
 
+void xorGreenLed(uint8_t pin){
+	GPIOC->ODR ^= (1 << (pin+6));
+}
+
+void batteryIndicationStartup(uint16_t voltageLevel){
+
+	if(voltageLevel > 419){
+		GPIOB->ODR |= (1 << 9);
+		GPIOB->ODR |= (1 << 8);
+		GPIOB->ODR |= (1 << 7);
+		GPIOB->ODR |= (1 << 6);
+		GPIOB->ODR |= (1 << 5);
+		delayMs(REAL_REAL_SLOW_DELAY);
+		GPIOB->ODR &=~ (1 << 9);
+		GPIOB->ODR &=~ (1 << 8);
+		GPIOB->ODR &=~ (1 << 7);
+		GPIOB->ODR &=~ (1 << 6);
+		GPIOB->ODR &=~ (1 << 5);
+	}
+	else if(voltageLevel > 394){
+		GPIOB->ODR |= (1 << 8);
+		GPIOB->ODR |= (1 << 7);
+		GPIOB->ODR |= (1 << 6);
+		GPIOB->ODR |= (1 << 5);
+		delayMs(REAL_REAL_SLOW_DELAY);
+		GPIOB->ODR &=~ (1 << 8);
+		GPIOB->ODR &=~ (1 << 7);
+		GPIOB->ODR &=~ (1 << 6);
+		GPIOB->ODR &=~ (1 << 5);
+	}
+	else if(voltageLevel > 379){
+		GPIOB->ODR |= (1 << 7);
+		GPIOB->ODR |= (1 << 6);
+		GPIOB->ODR |= (1 << 5);
+		delayMs(REAL_REAL_SLOW_DELAY);
+		GPIOB->ODR &=~ (1 << 7);
+		GPIOB->ODR &=~ (1 << 6);
+		GPIOB->ODR &=~ (1 << 5);
+	}
+	else if(voltageLevel > 369){
+		GPIOB->ODR |= (1 << 6);
+		GPIOB->ODR |= (1 << 5);
+		delayMs(REAL_REAL_SLOW_DELAY);
+
+		GPIOB->ODR &=~ (1 << 6);
+		GPIOB->ODR &=~ (1 << 5);
+	}
+	else if(voltageLevel > 360){
+		GPIOB->ODR |= (1 << 5);
+		delayMs(REAL_REAL_SLOW_DELAY);
+		GPIOB->ODR &=~ (1 << 5);
+	}
+}
+
 
 

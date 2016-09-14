@@ -316,7 +316,7 @@ void findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t *cluster, uin
 
 uint32_t findNextFreeCluster(uint8_t *buff, uint16_t _fsInfoSector){
 
-	/* ...Next free cluster is located in fs dginfo sector */
+	/* ...Next free cluster is located in fsinfo sector */
 
 	if(read_datablock(buff,_fsInfoSector))
 	return buff[NEXT_FREE_CLUSTER_LOW1]
@@ -597,9 +597,36 @@ uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *file
 	return 1;
 }
 
-void appendTextToTheEndOfFileBuffer(char* text, char endSymbol, uint16_t currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector){
+void appendTextToTheSD(char* text, char endofLineSymbol, uint16_t *currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector){
 
+	//Lenght of the write buff plus the endOfTheLineSymbol
+	uint8_t writeBufferLenght = strlen(text) + 1;
+	uint16_t symbolsLeftToWrite = 512  - *currentSymbolToWrite;
 
+	if(symbolsLeftToWrite < writeBufferLenght){
+
+        memcpy(writeBuff + *currentSymbolToWrite, text, symbolsLeftToWrite);
+        //Buffer right now is full, write it to sd
+        writeNextSectorOfFile(writeBuff,filename,filesize,_mstrDir,fatSect,cluster,sector);
+        //write rest of the string to new buff
+        strcpy((char*)&writeBuff[0], (text+symbolsLeftToWrite));
+        //add end symbol and calculate lenght of owerwritten buffer
+        *currentSymbolToWrite = writeBufferLenght - symbolsLeftToWrite;
+        *(writeBuff + *currentSymbolToWrite-1) = endofLineSymbol;
+	}
+	else if(symbolsLeftToWrite == writeBufferLenght){
+
+		memcpy((writeBuff + *currentSymbolToWrite), text, symbolsLeftToWrite-1);
+		writeBuff[511] = endofLineSymbol;
+		writeNextSectorOfFile(writeBuff,filename,filesize,_mstrDir,fatSect,cluster,sector);
+		*currentSymbolToWrite = 0;
+	}
+	else{
+        strcpy((char*)(writeBuff + *currentSymbolToWrite) , text);
+        //add endOffLine symbol
+        *currentSymbolToWrite +=writeBufferLenght;
+        *(writeBuff + *currentSymbolToWrite -1) = endofLineSymbol;
+	}
 }
 
 uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){

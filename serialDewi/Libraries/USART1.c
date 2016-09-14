@@ -1,6 +1,6 @@
 #include "USART1.h"
 
-void Usart1Init(int baudrate){
+void Usart1_Init(int baudrate){
 
 		/* Enable GPIO clock */
 		RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
@@ -42,7 +42,7 @@ void Usart1Init(int baudrate){
 
 }
 
-void Usart1Send(uint8_t data)
+void Usart1_Send(uint8_t data)
 {
 	USART_SendData(USART1,data);
 	while(USART_GetFlagStatus(USART1, USART_FLAG_TC ) == RESET)
@@ -50,13 +50,13 @@ void Usart1Send(uint8_t data)
 	}
 }
 
-void Usart1SendString(char* string){
+void Usart1_SendString(char* string){
 	while(*string != 0){
-		Usart1Send(*string++);
+		Usart1_Send(*string++);
 	}
 }
 
-char* Usart1RecieveString(char* String){
+char* Usart1_RecieveString(char* String){
 	while(*String != '\r'){
 		while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
 		*String++ = USART_ReceiveData(USART1);
@@ -64,10 +64,10 @@ char* Usart1RecieveString(char* String){
 	return String;
 }
 
-char* Usart1Recieve(void)
+uint16_t Usart1_Recieve(void)
 {
 	while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
-	return (char)USART_ReceiveData(USART1);
+	return USART_ReceiveData(USART1);
 }
 
 void ConfigureUsart1Interrupt(void)

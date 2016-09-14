@@ -4,21 +4,27 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-//My library includes
-#include "SysTickDelay.h"
-#include "myStringFunctions.h"
 
 //debugging
-#include "debug.h"
+
+//My library includes
+#include "SPI1.h"
+#include "SPI2.h"
+#include "SysTickDelay.h"
+#include "USART1.h"
+#include "USART2.h"
+#include "MyStringFunctions.h"
+#include "Timer.h"
+#include "PWM.h"
 
 //Device libraries
-#include "ADXL362.h"
 #include "Xbee.h"
-#include "IndicationGPIOs.h"
 #include "Button.h"
-#include "USART1.h"
-#include "PWM.h"
+#include "IndicationGPIOs.h"
+#include "ADXL362.h"
+#include "A2035H.h"
 #include "sdCard.h"
+
 
 //Xbee packet Defines
 #define AT_COMMAND_RESPONSE 0x88
@@ -30,11 +36,21 @@
 #define ERROR_TIMER_COUNT 30
 #define STARTUP_ERROR_TIMER_COUNT 5
 
+//ModuleStatus defines
+#define MODULE_SETUP_STATE 0x05
+#define MODULE_APPLYING_PARAMS 0x06
+#define MODULE_IDLE_READY 0x0C
+#define MODULE_RUNNING 0x08
+#define MODULE_TURNING_OFF 0x10
+
 //Xbee globals
 static char receivePacket[128];
 volatile bool dataUpdated = false;
 volatile uint8_t length,errorTimer,cheksum;
 bool readingPacket = false;
+//DEWI globals
+uint32_t globalCounter = 0;
+uint8_t moduleStatus = MODULE_SETUP_STATE;
 
 //sd globals
 //sd status
@@ -143,12 +159,19 @@ int main(void)
 	initializeRedLed3();
 	initializeRedLed4();
 	initializeRedLed5();
-	//Turn on first status led ( ACC )
-	//turnOnGreenLed(receiverNode.state);
 
 	InitializePwmPin();
 	InitializeTimer();
 	InitializePwm();
+
+	//Timer for second counter
+	Initialize_timer();
+	Timer_interrupt_enable();
+	//ADC for voltage control
+	adcPinConfig();
+	adcConfig();
+	//Periph variable
+	uint16_t ADC_value;
 
 	blinkRedLed1();
 
@@ -242,7 +265,12 @@ int main(void)
 			filesize = 512;
 	}
 
-	redStartup();
+	while(moduleStatus == MODULE_SETUP_STATE){
+    	ADC_value = (ADC_GetConversionValue(ADC1));
+    	ADC_value = (ADC_value * 330) / 128;
+    	batteryIndicationStartup(ADC_value);
+    	blinkGreenLeds(7);
+	}
 	while(1)
     {
     	if(dataUpdated == true){
@@ -416,7 +444,7 @@ int main(void)
         		        i = 5;
         		        for(; i < length; i++){				//Read AT data
         		          	AT_data[i - 5] = receivePacket[i];
-        		          	DEBUG_SEND_BYTE(AT_data[i - 5]);
+
         		        }
     		        }
 
@@ -567,9 +595,14 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 {
 	if(EXTI_GetITStatus(EXTI_Line8) == SET){	//Handler for Button2 pin interrupt
 
-		turnOnGreenLed(0);
-		sdStatus &= 0x02;
-		goToIdleState();
+		if(moduleStatus == MODULE_SETUP_STATE){
+			moduleStatus = MODULE_RUNNING;
+		}
+		else if(moduleStatus == MODULE_RUNNING){
+			turnOnGreenLed(0);
+			sdStatus &= 0x02;
+			goToIdleState();
+		}
 		EXTI_ClearITPendingBit(EXTI_Line8);
 	}
 
@@ -607,7 +640,14 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 	}
 }
 
-
+void TIM2_IRQHandler()
+{
+	if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
+	{
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+		globalCounter++;
+	}
+}
 
 
 

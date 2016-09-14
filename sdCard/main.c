@@ -26,10 +26,10 @@ int main(void){
 	uint16_t fatSect, fsInfoSector;
 	uint16_t sdBufferCurrentSymbol = 0;
 
-    char FATinfoString[30] = "";
-    char FATchar[8];
+	char FATinfoString[30] = "";
+	char FATchar[8];
 
-	uint16_t i,b;
+	uint16_t i;
 
 	uint8_t sdStatus;
 
@@ -43,42 +43,39 @@ int main(void){
 	sdStatus = initializeSD();
 
 	if(sdStatus == 0x01){
+
 		xorGreenLed1();
 
 		findDetailsOfFAT(buffer,&fatSect,&mstrDir, &fsInfoSector);
-
 		findDetailsOfFile("LOGFILE",buffer,mstrDir,&filesize,&cluster,&sector);
-
 		findLastClusterOfFile("LOGFILE",buffer, &cluster,fatSect,mstrDir);
+
+		xorGreenLed1();
 
 		if(filesize < 512)
 			filesize = 512;
 
-		b = 8;
-		while(b-- > 0){
-			while(i < 512 - 30){
+		appendTextToTheSD("\nNEW LOG", '\n', &sdBufferCurrentSymbol, buffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
 
-			    strcpy(&FATinfoString[0], "SIZE");
-			    itoa(filesize,FATchar);
-			    strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
-			    strcpy(&FATinfoString[strlen(FATinfoString)], "CLUST");
-			    itoa(cluster,FATchar);
-			    strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
-			    strcpy(&FATinfoString[strlen(FATinfoString)], "SECT");
-			    itoa(sector,FATchar);
-			    strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
-				strcpy((char*)&buffer[i], FATinfoString);
-				i+=strlen(FATinfoString);
-			}
-			writeNextSectorOfFile(buffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
-			i = 0;
-			xorGreenLed1();
+		//180 for writing 6 sectors
+		for(i; i < 180; i ++){
+		strcpy(&FATinfoString[0], "SIZE");
+		itoa(filesize,FATchar);
+		strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
+		strcpy(&FATinfoString[strlen(FATinfoString)], "SECT");
+		itoa(sector,FATchar);
+		strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
+		strcpy(&FATinfoString[strlen(FATinfoString)], "CLUST");
+		itoa(cluster,FATchar);
+		strcpy(&FATinfoString[strlen(FATinfoString)], FATchar);
+		appendTextToTheSD(FATinfoString, '\n', &sdBufferCurrentSymbol, buffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+		xorGreenLed1();
 		}
 
-		xorGreenLed1();
 		delayMs(100);
 		while(!goToIdleState());
-
+		xorGreenLed1();
+		//xorGreenLed1();
 		//Debug with SPI ->>>>>>> CooCox debugger sucks dick
 /*		SDSELECT();
 		spi_rw(cluster);

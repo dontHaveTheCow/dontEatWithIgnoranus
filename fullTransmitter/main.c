@@ -13,6 +13,8 @@
 #include "USART1.h"
 #include "USART2.h"
 #include "MyStringFunctions.h"
+#include "Timer.h"
+#include "ADC.h"
 
 //Device libraries
 #include "Xbee.h"
@@ -54,6 +56,9 @@ volatile bool readingNMEA = false;
 volatile bool readingGPGGA = false;
 volatile bool gpsDataUpdated = false;
 
+//DEWI globals
+uint32_t globalCounter = 0;
+
 int main(void){
 
 	//Local variables for xbee
@@ -81,14 +86,17 @@ int main(void){
 	//variables for sd card
 	//initialize sdcard (it uses the same SPI as Xbee)
 	uint8_t sdBuffer[512];
-	uint16_t sdBufferCounter = 0;
+	uint16_t sdBufferCurrentSymbol = 0;
 	uint8_t sector;
 	uint32_t mstrDir;
 	uint32_t cluster;
 	uint32_t filesize;
 	uint16_t fatSect, fsInfoSector;
-	uint8_t sdStatus = 0x01;
-
+	uint8_t sdStatus = 0x00;
+	//Periph variable
+	uint16_t ADC_value;
+	//Timer string
+	char timerString[8];
 
 	//Leds and buttons
 	initializeUserButton();
@@ -106,6 +114,12 @@ int main(void){
 	//SPI1 for xbee
 	InitialiseSPI1_GPIO();
 	InitialiseSPI1();
+	//Timer for second counter
+	Initialize_timer();
+	Timer_interrupt_enable();
+	//ADC for voltage control
+	adcPinConfig();
+	adcConfig();
 
 	//Xbee initialization (check if there arent unread data)
 	//... transmitter shouldn't have any received message from others
@@ -116,8 +130,13 @@ int main(void){
 	XBEE_CS_HIGH();
 
 	//Dewi Module wont start until the button is pressed
-	while(moduleStatus == MODULE_NOT_RUNNING)
-		amazingRedGreenStartup();
+	while(moduleStatus == MODULE_NOT_RUNNING){
+    	ADC_value = (ADC_GetConversionValue(ADC1));
+    	ADC_value = (ADC_value * 330) / 128;
+    	batteryIndicationStartup(ADC_value);
+    	blinkGreenLeds(7);
+	}
+
 
 	//12 seconds to choose the modules to use
 	//One redStartup take about 500ms, so let it spin for twenty times
@@ -132,6 +151,7 @@ int main(void){
 	//ADXL362Z
 	if(state&0x01){
 		initializeADXL362();
+		blinkRedLed3();
 		while(!return_ADXL_ready()){
 			//wait time for caps to discharge
 			delayMs(2000);
@@ -145,19 +165,24 @@ int main(void){
 	if((state&0x02) >> 1){
 		//turnGpsOn();
 		//while(gpsReceiveString[])
+		blinkRedLed4();
 	}
 
 	//SD
 	if((state&0x04) >> 2){
 
 		errorTimer = 10;
-		/*while(!initializeSD() && errorTimer-- > 1){
-			delayMs(200);
+		while(!initializeSD() && errorTimer-- > 1){
+			delayMs(300);
 			blinkRedLed5();
 		}
-		if(!errorTimer)
-			sdStatus = 0x00;
+		if(!errorTimer){
+			//If sd card doesnt turn on, dont log anything to it
+			state &= 0xFB;
+		}
 		else{
+			blinkGreenLed1();
+
 			findDetailsOfFAT(sdBuffer,&fatSect,&mstrDir, &fsInfoSector);
 
 			findDetailsOfFile("LOGFILE",sdBuffer,mstrDir,&filesize,&cluster,&sector);
@@ -166,11 +191,13 @@ int main(void){
 
 			if(filesize < 512)
 				filesize = 512;
+
+			appendTextToTheSD("\nNEW LOG", '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
 		}
-	*/
 	}
 
 	moduleStatus = MODULE_IDLE_READY;
+	turnOnGreenLeds(state);
 	while(moduleStatus == MODULE_IDLE_READY){
 		blinkGreenLeds(state);
 		redStartup(DELAY);
@@ -191,42 +218,24 @@ int main(void){
     		    strcpy(&transmitString[2],&messurementString[0]);
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
     			//if sd card is active, log data to it
-    			if(sdStatus){
-    			//Firstly check if you wont overwrite the buffer
-    				if((sdBufferCounter + strlen(&transmitString[0]) + 1) > 512){
-    				//if there is not enough space for next entry, write it to tmp-buffer and then to next sector
-    				//need to add code to fill the whole sector
-    					while(sdBufferCounter < 512){
-    						sdBuffer[sdBufferCounter++] = ' ';
-    					}
-    					writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
-    					sdBufferCounter = 0;
-    					strcpy((char*)(&sdBuffer[sdBufferCounter]),&transmitString[0]);
-    					sdBufferCounter += strlen(&transmitString[0]);
-    					sdBuffer[sdBufferCounter++] = '\n';
-    				}
-    				else{
-    					strcpy((char*)(&sdBuffer[sdBufferCounter]),&transmitString[0]);
-    					sdBufferCounter += strlen(&transmitString[0]);
-    					sdBuffer[sdBufferCounter++] = '\n';
-    					if(sdBufferCounter == 512){
-    						writeNextSectorOfFile(sdBuffer,"LOGFILE",&filesize,mstrDir,fatSect,&cluster,&sector);
-    						sdBufferCounter = 0;
-    					}
-    				}
+    			if((state&0x04) >> 2){
+    				itoa(globalCounter,timerString);
+    				appendTextToTheSD(timerString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				appendTextToTheSD(transmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				xorGreenLed(2);
     			}
-    			blinkGreenLed1();
+    			xorGreenLed(0);
     		}
     		delayMs(600);
     		//Transmit gps data
     		if((state&0x02) >> 1){
     			strcpy(transmitString, "1 1234");
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
-    			blinkGreenLed2();
+    			xorGreenLed(1);
     		}
     		break;
-    	case MODULE_IDLE_READY:
 
+    	case MODULE_IDLE_READY:
     		if(turnOffTimer > 0){
     			turnOffTimer--;
         		blinkGreenLeds(state);
@@ -234,7 +243,9 @@ int main(void){
     		}
     		else{
         		blinkGreenLeds(state);
-        		redStartup(REAL_REAL_SLOW_DELAY);
+            	ADC_value = (ADC_GetConversionValue(ADC1));
+            	ADC_value = (ADC_value * 330) / 128;
+            	batteryIndicationStartup(ADC_value);
     		}
     		break;
 
@@ -338,6 +349,15 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 			GPIO_SetBits(GPIOA,GPIO_Pin_4);
 		}
 		EXTI_ClearITPendingBit(EXTI_Line4);
+	}
+}
+
+void TIM2_IRQHandler()
+{
+	if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
+	{
+		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+		globalCounter++;
 	}
 }
 

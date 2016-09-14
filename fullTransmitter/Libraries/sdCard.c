@@ -234,7 +234,7 @@ uint8_t findDetailsOfFile(char* filename, uint8_t *buff, uint32_t _mstrDir, uint
 	uint8_t directoryCount = 0;
 	delayMs(1);
 	while(!read_datablock(buff,_mstrDir));
-	delayMs(1);
+	delayMs(1 );
 	while(!startsWith(filename,(char*)buff)){
 		//Each byte directory is 32 bytes long
 		//If Short Filename doesn't match, jump to next directory
@@ -594,8 +594,39 @@ uint8_t writeNextSectorOfFile(uint8_t *writeBuff, char* filename, uint32_t *file
 		*sector = 0;
 		*cluster = allocateNewCluster(writeBuff,fatSect,*cluster);
 	}
-
 	return 1;
+}
+
+void appendTextToTheSD(char* text, char endofLineSymbol, uint16_t *currentSymbolToWrite, uint8_t *writeBuff, char* filename, uint32_t *filesize, uint32_t _mstrDir, uint16_t fatSect, uint32_t *cluster, uint8_t *sector){
+
+	//Lenght of the write buff plus the endOfTheLineSymbol
+	uint8_t writeBufferLenght = strlen(text) + 1;
+	uint16_t symbolsLeftToWrite = 512  - *currentSymbolToWrite;
+
+	if(symbolsLeftToWrite < writeBufferLenght){
+
+        memcpy(writeBuff + *currentSymbolToWrite, text, symbolsLeftToWrite);
+        //Buffer right now is full, write it to sd
+        writeNextSectorOfFile(writeBuff,filename,filesize,_mstrDir,fatSect,cluster,sector);
+        //write rest of the string to new buff
+        strcpy((char*)&writeBuff[0], (text+symbolsLeftToWrite));
+        //add end symbol and calculate lenght of owerwritten buffer
+        *currentSymbolToWrite = writeBufferLenght - symbolsLeftToWrite;
+        *(writeBuff + *currentSymbolToWrite-1) = endofLineSymbol;
+	}
+	else if(symbolsLeftToWrite == writeBufferLenght){
+
+		memcpy((writeBuff + *currentSymbolToWrite), text, symbolsLeftToWrite-1);
+		writeBuff[511] = endofLineSymbol;
+		writeNextSectorOfFile(writeBuff,filename,filesize,_mstrDir,fatSect,cluster,sector);
+		*currentSymbolToWrite = 0;
+	}
+	else{
+        strcpy((char*)(writeBuff + *currentSymbolToWrite) , text);
+        //add endOffLine symbol
+        *currentSymbolToWrite +=writeBufferLenght;
+        *(writeBuff + *currentSymbolToWrite -1) = endofLineSymbol;
+	}
 }
 
 uint32_t allocateNewCluster(uint8_t *buff, uint16_t fatSect, uint32_t cluster){
