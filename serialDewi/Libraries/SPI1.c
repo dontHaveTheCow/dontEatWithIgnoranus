@@ -101,10 +101,10 @@ uint8_t SPI1_TransRecieve(uint8_t data){
 	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);
 	SPI_SendData8(SPI1,data);
 	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_BSY) == SET);
-//	while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);
+	SPI_I2S_ClearFlag(SPI1, SPI_I2S_FLAG_RXNE);
 	return SPI_ReceiveData8(SPI1);
 
-	SPI_I2S_ClearFlag(SPI1, SPI_I2S_FLAG_RXNE);
+
 }
 
 uint8_t spi_rw(uint8_t out) {

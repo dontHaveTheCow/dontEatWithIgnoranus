@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include "IndicationGPIOs.h"
 
+#define BAUD_115200 115200
 #define BAUD_9600 9600
 #define BAUD_4800 4800
 

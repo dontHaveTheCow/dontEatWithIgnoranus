@@ -29,7 +29,6 @@ void itoa(int n, char s[])
 }
 
 void str_splitter(char* buffer, char* _key, char* _value, char* delimiter){
-
-    strcpy(_key, strtok(buffer, delimiter));
-    strcpy(_value, strtok(NULL, delimiter));
+	strcpy(_key, strtok(buffer, delimiter));
+	strcpy(_value, strtok(NULL, '\0'));
 }
