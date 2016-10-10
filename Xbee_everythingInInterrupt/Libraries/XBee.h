@@ -31,6 +31,7 @@ void apply1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1);
 void queue1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1);
 uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte);
 void askModuleParams(uint8_t MSbyte, uint8_t LSbyte, uint8_t frameID);
+bool xbeeStartupParamRead(uint8_t _packetErrorLimit, uint8_t* _xbeeBuffer);
 
 //Data transmission functions
 void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uint8_t adr5, uint8_t adr6, uint8_t adr7, uint8_t adr8, char* data);

@@ -156,6 +156,36 @@ void askModuleParams(uint8_t MSbyte, uint8_t LSbyte, uint8_t frameID){
 	XBEE_CS_HIGH();
 }
 
+bool xbeeStartupParamRead(uint8_t _packetErrorLimit, uint8_t* _xbeeBuffer){
+
+	uint8_t checksum = 0;
+	uint8_t errorTimer = 0;
+	uint8_t length;
+
+	XBEE_CS_LOW();
+	while(SPI1_TransRecieve(0x00) != 0x7E){	//Wait for start delimiter
+	errorTimer++;
+	if(errorTimer >_packetErrorLimit)//Exit loop if there is no start delimiter
+			break;
+	}
+	if(errorTimer < _packetErrorLimit){
+		SPI1_TransRecieve(0x00);
+		length = SPI1_TransRecieve(0x00);
+		//printf("Lenght: %d\n", length);
+		uint8_t i = 0;
+		for(; i < length; i ++ ){				//Read data based on packet length
+			checksum += (_xbeeBuffer[i] = SPI1_TransRecieve(0x00));
+		}
+		checksum += SPI1_TransRecieve(0x00);
+		XBEE_CS_HIGH();
+		if(checksum == 0xFF){
+			return true;
+		}
+	}
+	XBEE_CS_HIGH();
+	return false;
+}
+
 void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uint8_t adr5, uint8_t adr6, uint8_t adr7, uint8_t adr8, char* data){
 
 	int8_t cheksum = 0;
@@ -201,4 +231,6 @@ void transmitRequest(uint8_t adr1, uint8_t adr2, uint8_t adr3, uint8_t adr4, uin
 	SPI1_TransRecieve(0xFF - cheksum); //Cheksum
 	XBEE_CS_HIGH();
 }
+
+
 

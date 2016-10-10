@@ -68,6 +68,9 @@ int main(void){
 	int16_t z = 0;
 	int16_t z_low = 0;
 	int16_t z_high = 0;
+	int16_t x = 0;
+	int16_t x_low = 0;
+	int16_t x_high = 0;
 	char messurementString[6];
 	//variable for iterations
 	int i;
@@ -211,8 +214,8 @@ int main(void){
     		delayMs(600);
     		//Transmit acc data
     		if(state&0x01){
-    		  	getZ(&z,&z_low,&z_high);
-    		    itoa(z, messurementString);
+    		  	getX(&x,&x_low,&x_high);
+    		    itoa(x, messurementString);
     		    transmitString[0] = '0';
     		    transmitString[1] = ' ';
     		    strcpy(&transmitString[2],&messurementString[0]);

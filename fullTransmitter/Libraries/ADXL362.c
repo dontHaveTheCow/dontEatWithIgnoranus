@@ -54,6 +54,18 @@ void getZ(int16_t *z, int16_t *z_low, int16_t *z_high){
 	*z = (*z_high << 8) + *z_low;
 }
 
+void getX(int16_t *x, int16_t *x_low, int16_t *x_high){
+
+	GPIO_ResetBits(GPIOB,GPIO_Pin_12);
+	SPI2_TransRecieve(ADXL_READ);
+	SPI2_TransRecieve(0x0E);
+	*x_low=SPI2_TransRecieve(0x00);
+	*x_high=SPI2_TransRecieve(0x00);
+	GPIO_SetBits(GPIOB,GPIO_Pin_12);
+
+	*x = (*x_high << 8) + *x_low;
+}
+
 int16_t returnZ_axis(void){
 
 	int16_t z_low = 0;

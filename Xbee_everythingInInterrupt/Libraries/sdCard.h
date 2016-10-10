@@ -69,7 +69,7 @@
 //SD layer routines
 uint8_t initializeSD(void);
 uint8_t send_cmd(uint8_t cmd, uint32_t arg);
-uint8_t goToIdleState(void);
+uint8_t sdIdleState(void);
 
 //FAT layer functions
 uint8_t xmit_datablock(uint8_t *buff, uint32_t sector);

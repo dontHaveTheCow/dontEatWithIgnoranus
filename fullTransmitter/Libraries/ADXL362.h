@@ -28,6 +28,7 @@ void writeADXL326Register(uint8_t reg, uint8_t cmd);
 uint8_t readADXL362Register(uint8_t reg);
 int16_t SPIreadTwoRegisters(uint8_t regAddress);
 void getZ(int16_t *z, int16_t *z_low, int16_t *z_high);
+void getX(int16_t *x, int16_t *x_low, int16_t *x_high);
 int16_t returnZ_axis(void);
 bool return_ADXL_ready(void);
 

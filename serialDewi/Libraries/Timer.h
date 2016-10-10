@@ -10,7 +10,7 @@
 
 //These are the Define statements
 #define PRESCALER_VALUE 8000
-#define PERIOD_VALUE 1000
+#define PERIOD_VALUE 1 // 1000 -> 1s
 
 //These are the prototypes for the routines
 void Initialize_timer(void);

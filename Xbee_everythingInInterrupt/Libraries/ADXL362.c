@@ -69,6 +69,21 @@ int16_t returnZ_axis(void){
 	return (z_high << 8) + z_low;
 }
 
+int16_t returnX_axis(void){
+
+	int16_t x_low = 0;
+	int16_t x_high = 0;
+
+	GPIO_ResetBits(GPIOB,GPIO_Pin_12);
+	SPI2_TransRecieve(ADXL_READ);
+	SPI2_TransRecieve(0x0E);
+	x_low=SPI2_TransRecieve(0x00);
+	x_high=SPI2_TransRecieve(0x00);
+	GPIO_SetBits(GPIOB,GPIO_Pin_12);
+
+	return (x_high << 8) + x_low;
+}
+
 bool return_ADXL_ready(void){
 
 	if ((readADXL362Register(ADXL_STATUS_REGISTER) & ADXL_STATUS_REGISTER_DATA_READY_BIT) == ADXL_STATUS_REGISTER_DATA_READY_BIT)

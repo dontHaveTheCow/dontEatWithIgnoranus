@@ -114,7 +114,7 @@ uint8_t send_cmd(uint8_t cmd, uint32_t arg){
 	return res;
 }
 
-uint8_t goToIdleState(void){
+uint8_t sdIdleState(void){
 	if(send_cmd(CMD0, 0) == 1){
 		release_spi();
 		return 1;
