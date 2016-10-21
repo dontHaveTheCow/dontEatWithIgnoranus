@@ -35,7 +35,7 @@ int main(void)
     char latd[2]= " ";
     char lon[11]= " ";
     char lond[2]= " ";
-    char fix[2]= " ";
+    char fix[2]= "0";
     char sats[3]= " ";
     char velocity[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
@@ -65,12 +65,27 @@ int main(void)
 	delayMs(400);
 	blinkRedLed2();
 	gps_dissableMessage($GPRMC);
-	delayMs(400);
-	blinkRedLed2();
-	gps_dissableMessage($GPVTG);
-	delayMs(400);
-	gps_setRate($GPGGA,1);
 	gpsIsOn = true;
+
+	//Wait until there is an satellite connection
+	while(fix[0] == '0'){
+		if(gpsDataUpdated){
+			gpsDataUpdated = false;
+			messageIterator = 0;
+			ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
+			for(; messageIterator < 7; messageIterator ++){
+				tmpPtr = ptrToNMEA[messageIterator];
+				while(*ptr++ != ','){
+					*ptrToNMEA[messageIterator]++ = *(ptr-1);
+				}
+				ptrToNMEA[messageIterator] = tmpPtr;
+			}
+			blinkRedLed1();
+    		Usart1_Send('\n');
+    		Usart1_SendString(ts);
+    		Usart1_SendString(" No GPS fix\r\n");
+		}
+	}
 
     while(1){
     	if(gpsDataUpdated){
@@ -84,8 +99,6 @@ int main(void)
     	        }
     	        ptrToNMEA[messageIterator] = tmpPtr;
     	    }
-
-    	    gps_parseGPGGA("$GPGGA,173141.267,4807.038,N,01131.000,E,0,08,0.9,545.4,M,46.9,M,,*47",ts,lat,lon,fix,sats);
 
     	    if(fix[0] == '0'){
         		Usart1_Send('\n');
