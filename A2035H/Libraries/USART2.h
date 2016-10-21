@@ -14,6 +14,4 @@ uint8_t Usart2_Recieve(void);
 void ConfigureUsart2Interrupt(void);
 void Usart2_SendString(char* string);
 
-
-
 #endif

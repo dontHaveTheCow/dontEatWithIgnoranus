@@ -9,16 +9,22 @@
 #include "stdbool.h"
 #include <stm32f0xx_exti.h>
 #include "Button.h"
+#include "sdCard.h"
 
 #define BAUD_9600 9600
 #define BAUD_4800 4800
 
 volatile bool gpsIsOn = false;
-char gpsReceiveString[80];
-uint8_t gpsReadIterator;
+volatile bool gpsTurnOff = false;
+volatile bool gpsTurnOn = false;
+char gpsReceiveString[96];
+uint8_t gpsReadIterator = 0;
 volatile bool readingNMEA = false;
 volatile bool readingGPGGA = false;
 volatile bool gpsDataUpdated = false;
+
+uint8_t errorTimer;
+uint8_t state = 1;
 
 int main(void)
 {
@@ -34,29 +40,44 @@ int main(void)
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
 
-
 	//Clock for GPS
 	setupGpsGpio();
 	initialiseSysTick();
 	initializeRedLed1();
+	initializeRedLed2();
 	initializeGreenLed1();
 	initializeUserButton();
 	//initializeDiscoveryLeds();
 	Usart2_Init(BAUD_4800);
 	Usart1_Init(BAUD_9600);
 	ConfigureUsart2Interrupt();
-	setupGpsTimer();
-	setupGpsTimerInterrupt();
+	//spi used for sd card
 
 	turnGpsOn();
-	gpsIsOn = true;
 
+	delayMs(400);
+	blinkRedLed2();
+	gps_disable5hz();
+	delayMs(400);
+	blinkRedLed2();
+	gps_dissableMessage($GPGSA);
+	delayMs(400);
+	blinkRedLed2();
+	gps_dissableMessage($GPGSV);
+	delayMs(400);
+	blinkRedLed2();
+	gps_dissableMessage($GPRMC);
+	delayMs(400);
+	blinkRedLed2();
+	//gps_dissableMessage($GPVTG);
+	gps_setRate($GPVTG,1);
+	gpsIsOn = true;
 
     while(1){
     	if(gpsDataUpdated){
     		gpsDataUpdated = false;
     		messageIterator = 0;
-    		ptr = &gpsReceiveString[6];
+    		ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
     	    for(; messageIterator < 7; messageIterator ++){
     	    	tmpPtr = ptrToNMEA[messageIterator];
     	        while(*ptr++ != ','){
@@ -65,6 +86,7 @@ int main(void)
     	        ptrToNMEA[messageIterator] = tmpPtr;
     	    }
     	    if(fix[0] == '0'){
+        		Usart1_Send('\n');
         		Usart1_SendString(ts);
         		Usart1_SendString(" No GPS fix\r\n");
     	    }
@@ -73,11 +95,17 @@ int main(void)
         		Usart1_Send('\r');
         		Usart1_Send('\n');
     	    }
-    	    TIM_Cmd(TIM2,ENABLE);
     	    GPIOC->ODR ^= GPIO_Pin_6;
     	}
-    	if(!gpsIsOn)
+    	if(gpsTurnOff == true){
     		hibernateGps();
+    		gpsTurnOff = false;
+    	}
+    	else if(gpsTurnOn == true){
+    		turnGpsOn();
+    		gpsTurnOn = false;
+    	}
+
     }
 }
 
@@ -87,14 +115,13 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 
 		GPIOB->ODR ^= GPIO_Pin_5;
 		if(gpsIsOn){
-			USART_Cmd(USART2, DISABLE);
 			gpsIsOn = false;
+			gpsTurnOff = true;
 		}
 		else{
-			USART_Cmd(USART2, ENABLE);
 			gpsIsOn = true;
+			gpsTurnOn = true;
 		}
-
 
 		EXTI_ClearITPendingBit(EXTI_Line8);
 	}
@@ -102,14 +129,22 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 
 void USART2_IRQHandler(void){
 	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
-		if(readingGPGGA == true){
+
+		Usart1_Send(USART_ReceiveData(USART2));
+		GPIOC->ODR ^= GPIO_Pin_6;
+
+/*		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == 0x0D){
+			gpsDataUpdated = true;
+			gpsReadIterator = 0;
+		}*/
+
+/*		if(readingGPGGA == true){
 			gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2);
 			if(gpsReceiveString[gpsReadIterator-1] == 0x0D){
 				gpsDataUpdated = true;
 				gpsReceiveString[gpsReadIterator-1] = '\0';
 				readingNMEA = false;
 				readingGPGGA = false;
-				USART_Cmd(USART2, DISABLE);
 			}
 		}
 		else if(readingNMEA == true){
@@ -126,20 +161,7 @@ void USART2_IRQHandler(void){
 		else if(USART_ReceiveData(USART2) == '$'){
 			gpsReadIterator = 0;
 			readingNMEA = true;
-		}
-
+		}*/
 	}
 }
 
-void TIM2_IRQHandler()
-{
-	if(TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET)
-	{
-		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-      	GPIOC->ODR ^= GPIO_Pin_6;
-      	TIM_Cmd(TIM2,DISABLE);
-      	USART_Cmd(USART2, ENABLE);
-	}
-
-
-}

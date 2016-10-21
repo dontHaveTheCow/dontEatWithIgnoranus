@@ -70,3 +70,54 @@ void setupGpsTimerInterrupt(void){
 	//TIM_Cmd(TIM2,ENABLE);
 	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
 }
+
+void gps_dissableMessage(uint8_t $MSG){
+
+	/*
+	 * Cheksum is an XOR of all the bytes between the $ and the *
+	 * For $PSRF103,00,00,00,01* is 0x24
+	 */
+	char checksum_str[3];
+	uint8_t checksum = $MSG^0x24;
+	sprintf(checksum_str,"%x",checksum);
+
+	Usart2_SendString("$PSRF103,0");
+	Usart2_Send($MSG + ASCII_DIGIT_OFFSET);
+	Usart2_SendString(",00,00,01*");
+	Usart2_Send(checksum_str[0]);
+	Usart2_Send(checksum_str[1]);
+	Usart2_Send('\r');
+	Usart2_Send('\n');
+
+}
+void gps_setRate(uint8_t $MSG, uint8_t rate){
+
+	/*
+	 * Note that the 5Hz mode works only in navigation mode
+	 *  once a GPS fix has been obtained. Until it gets a fix,
+	 *   the receiver will work in 1Hz mode.
+	 */
+
+	char checksum_str[3];
+	uint8_t checksum = $MSG^0x24^rate;
+	sprintf(checksum_str,"%x",checksum);
+
+	Usart2_SendString("$PSRF103,0");
+	Usart2_Send($MSG + ASCII_DIGIT_OFFSET);
+	Usart2_SendString(",00,0");
+	Usart2_Send(rate + ASCII_DIGIT_OFFSET);
+	Usart2_SendString(",01*");
+	Usart2_Send(checksum_str[0]);
+	Usart2_Send(checksum_str[1]);
+	Usart2_Send('\r');
+	Usart2_Send('\n');
+}
+
+void gps_enable5hz(void){
+	Usart2_SendString("$PSRF103,00,6,00,0*23\r\n");
+}
+
+void gps_disable5hz(void){
+	Usart2_SendString("$PSRF103,00,7,00,0*22\r\n");
+}
+
