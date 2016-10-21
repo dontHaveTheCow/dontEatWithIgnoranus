@@ -37,6 +37,7 @@ int main(void)
     char lond[2]= " ";
     char fix[2]= " ";
     char sats[3]= " ";
+    char velocity[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
 
@@ -57,9 +58,6 @@ int main(void)
 
 	delayMs(400);
 	blinkRedLed2();
-	gps_disable5hz();
-	delayMs(400);
-	blinkRedLed2();
 	gps_dissableMessage($GPGSA);
 	delayMs(400);
 	blinkRedLed2();
@@ -69,8 +67,9 @@ int main(void)
 	gps_dissableMessage($GPRMC);
 	delayMs(400);
 	blinkRedLed2();
-	//gps_dissableMessage($GPVTG);
-	gps_setRate($GPVTG,1);
+	gps_dissableMessage($GPVTG);
+	delayMs(400);
+	gps_setRate($GPGGA,1);
 	gpsIsOn = true;
 
     while(1){
@@ -85,6 +84,9 @@ int main(void)
     	        }
     	        ptrToNMEA[messageIterator] = tmpPtr;
     	    }
+
+    	    gps_parseGPGGA("$GPGGA,173141.267,4807.038,N,01131.000,E,0,08,0.9,545.4,M,46.9,M,,*47",ts,lat,lon,fix,sats);
+
     	    if(fix[0] == '0'){
         		Usart1_Send('\n');
         		Usart1_SendString(ts);
@@ -130,13 +132,13 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 void USART2_IRQHandler(void){
 	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
 
-		Usart1_Send(USART_ReceiveData(USART2));
-		GPIOC->ODR ^= GPIO_Pin_6;
+/*		Usart1_Send(USART_ReceiveData(USART2));
+		GPIOC->ODR ^= GPIO_Pin_6;*/
 
-/*		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == 0x0D){
+		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == 0x0D){
 			gpsDataUpdated = true;
 			gpsReadIterator = 0;
-		}*/
+		}
 
 /*		if(readingGPGGA == true){
 			gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2);

@@ -121,3 +121,43 @@ void gps_disable5hz(void){
 	Usart2_SendString("$PSRF103,00,7,00,0*22\r\n");
 }
 
+void gps_parseGPGGA(char* gpsString, char* ts, char* lat, char* lon, char* fix, char* sats){
+
+	uint8_t stringIterator = 7;
+	uint8_t messageIterator = 0;
+	char delimiter = ',';
+
+	while(*(gpsString+stringIterator) != delimiter)
+		*ts++ = *(gpsString+stringIterator++);
+    stringIterator++;
+    while(*(gpsString+stringIterator) != delimiter)
+        *lat++ = *(gpsString+stringIterator++);
+    stringIterator++;
+    while(*(gpsString+stringIterator++) != delimiter);
+    while(*(gpsString+stringIterator) != delimiter)
+        *lon++ = *(gpsString+stringIterator++);
+    stringIterator++;
+    while(*(gpsString+stringIterator++) != delimiter);
+    messageIterator = 0;
+    while(*(gpsString+stringIterator) != delimiter)
+        fix[messageIterator++] = *(gpsString+stringIterator++);
+    stringIterator++;
+    while(*(gpsString+stringIterator) != delimiter)
+        *sats++ = *(gpsString+stringIterator++);
+}
+
+void gps_parseGPVTG(char* gpsString, char* speed){
+    //$GPVTG,,T,,M,,N,,K,N*2C
+    //$GPVTG,189.45,T,,M,0.00,N,0.0,K,A*0C
+    int commaCounter = 0;
+
+    while(commaCounter !=7){
+        if(*gpsString++ == ',')
+            commaCounter++;
+    }
+    while(*gpsString != ','){
+       *speed++ = *gpsString++;
+    }
+
+}
+

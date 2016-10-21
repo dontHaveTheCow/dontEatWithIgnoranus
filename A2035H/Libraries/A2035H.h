@@ -9,6 +9,7 @@
 #include <stm32f0xx_tim.h>
 #include <stm32f0xx_misc.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "USART2.h"
 
@@ -25,6 +26,7 @@
 #define $GPRMC 4
 #define $GPVTG 5
 #define ASCII_DIGIT_OFFSET 0x30
+#define FIRST_GPGGA_DIGIT_INDEX 7
 
 //These are the prototypes for the routines
 void turnGpsOn(void);
@@ -38,5 +40,9 @@ void gps_dissableMessage(uint8_t message);
 void gps_setRate(uint8_t message, uint8_t rate);
 void gps_enable5hz(void);
 void gps_disable5hz(void);
+
+//Measurement parse functions
+void gps_parseGPGGA(char* gpsString, char* ts, char* lat, char* lon, char* fix, char* sats);
+void gps_parseGPVTG(char* gpsString, char* speed);
 
 #endif
