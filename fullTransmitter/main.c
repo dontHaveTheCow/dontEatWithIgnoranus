@@ -49,11 +49,8 @@ uint8_t moduleStatus= MODULE_NOT_RUNNING;
 uint8_t turnOffTimer = 0;
 
 //Gps globals
-volatile bool gpsIsOn = false;
 char gpsReceiveString[80];
 uint8_t gpsReadIterator;
-volatile bool readingNMEA = false;
-volatile bool readingGPGGA = false;
 volatile bool gpsDataUpdated = false;
 
 //DEWI globals
@@ -75,15 +72,16 @@ int main(void){
 	//variable for iterations
 	int i;
 	//variables for gps
-	char* gpsPtr;
-	char* tmpGpsPtr;
+	char* ptr;
+	char* tmpPtr;
     char ts[11] = " ";
     char lat[11] = " ";
     char latd[2]= " ";
     char lon[11]= " ";
     char lond[2]= " ";
-    char fix[2]= " ";
+    char fix[2]= "0";
     char sats[3]= " ";
+    char velocity[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
 	//variables for sd card
@@ -101,23 +99,21 @@ int main(void){
 	//Timer string
 	char timerString[8];
 
-	//Leds and buttons
+	//Leds and buttons, gpio's
 	initializeUserButton();
 	initializeEveryGreenLed();
 	initializeEveryRedLed();
+	setupGpsGpio();
 	//SPI attention pin for incoming data alert
 	initializeXbeeATTnPin();
 	//Usart1 for debugging and serial communication
 	Usart1_Init(9600);
 	//System clock for delays
 	initialiseSysTick();
-	//SPI2 for ADXL
-	InitialiseSPI2_GPIO();
-	InitialiseSPI2();
 	//SPI1 for xbee
 	InitialiseSPI1_GPIO();
 	InitialiseSPI1();
-	//Timer for second counter
+	//Timer for counter (1s)
 	Initialize_timer();
 	Timer_interrupt_enable();
 	//ADC for voltage control
@@ -125,7 +121,7 @@ int main(void){
 	adcConfig();
 
 	//Xbee initialization (check if there arent unread data)
-	//... transmitter shouldn't have any received message from others
+	//... transmitter shouldn't have any received messages from others
 	XBEE_CS_LOW();
 	while(errorTimer--){
 		SPI1_TransRecieve(0x00);
@@ -140,7 +136,6 @@ int main(void){
     	blinkGreenLeds(7);
 	}
 
-
 	//12 seconds to choose the modules to use
 	//One redStartup take about 500ms, so let it spin for twenty times
 	//Default state is 1 (only acc is on)
@@ -153,6 +148,9 @@ int main(void){
 
 	//ADXL362Z
 	if(state&0x01){
+		//SPI2 for ADXL
+		InitialiseSPI2_GPIO();
+		InitialiseSPI2();
 		initializeADXL362();
 		blinkRedLed3();
 		while(!return_ADXL_ready()){
@@ -166,11 +164,74 @@ int main(void){
 
 	//GPS
 	if((state&0x02) >> 1){
-		//turnGpsOn();
-		//while(gpsReceiveString[])
-		blinkRedLed4();
-	}
+/*		//Usart 2 for gps communication
+		Usart2_Init(BAUD_4800);
+		ConfigureUsart2Interrupt();
+		errorTimer = 40;
 
+		turnGpsOn();
+
+		//Make sure that gps module has waken up
+		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN) && errorTimer-- > 0){
+			blinkRedLed4();
+			delayMs(1000);
+		}
+
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPVTG);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPGSV);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPRMC);
+		delayMs(400);
+		blinkRedLed4();
+		gps_setRate($GPGGA, 1);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPGSA);
+
+		//Wait for enough satellites
+		while(fix[0] == '0' && errorTimer > 0 ){
+			if(gpsDataUpdated){
+				errorTimer--;
+				gpsDataUpdated = false;
+				messageIterator = 0;
+
+				 * Make sure that you are comparing GPGGA message
+				 * $PSRF and $GPVTG messages are possable at the startup
+
+				if(strncmp(gpsReceiveString,"$GPGGA", 6) == 0){
+					ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
+					for(; messageIterator < 7; messageIterator ++){
+						tmpPtr = ptrToNMEA[messageIterator];
+						while(*ptr++ != ','){
+							*ptrToNMEA[messageIterator]++ = *(ptr-1);
+						}
+						ptrToNMEA[messageIterator] = tmpPtr;
+					}
+				}
+				SEND_SERIAL_MSG("Waiting for sats...\r\n");
+				blinkRedLed4();
+			}
+		}
+		//if not enough satellites are found, turn off gps
+		if(!errorTimer){
+			SEND_SERIAL_MSG("GPS timeout...\r\n");
+			hibernateGps();
+			state &= 0xFD;
+		}
+		else{
+			//if satellites found -> turn on $GPVTG to monitor velocity
+			gps_dissableMessage($GPGGA);
+			delayMs(400);
+			blinkRedLed4();
+			gps_setRate($GPVTG, 1);
+			SEND_SERIAL_MSG("SATs found...\r\n");
+		}*/
+	}
 	//SD
 	if((state&0x04) >> 2){
 
@@ -201,6 +262,7 @@ int main(void){
 
 	moduleStatus = MODULE_IDLE_READY;
 	turnOnGreenLeds(state);
+	SEND_SERIAL_MSG("NODE READY!!!\r\n");
 	while(moduleStatus == MODULE_IDLE_READY){
 		blinkGreenLeds(state);
 		redStartup(DELAY);
@@ -232,8 +294,19 @@ int main(void){
     		delayMs(600);
     		//Transmit gps data
     		if((state&0x02) >> 1){
-    			strcpy(transmitString, "1 1234");
+    			if(strncmp(gpsReceiveString,"$GPVTG" , 6) == 0){
+    				gps_parseGPVTG(gpsReceiveString,velocity);
+    			}
+    			else{
+    				strcpy(velocity,"999.9");
+    			}
+       		    transmitString[0] = '1';
+        		transmitString[1] = ' ';
+        		strcpy(&transmitString[2],velocity);
+
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+    			SEND_SERIAL_MSG(transmitString);
+    			SEND_SERIAL_MSG(" MESSAGE_SENT\r\n");
     			xorGreenLed(1);
     		}
     		break;
@@ -267,34 +340,14 @@ int main(void){
    	}
 }
 
-/*void USART2_IRQHandler(void){
+void USART2_IRQHandler(void){
 	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
-		if(readingGPGGA == true){
-			gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2);
-			if(gpsReceiveString[gpsReadIterator-1] == 0x0D){
-				gpsDataUpdated = true;
-				gpsReceiveString[gpsReadIterator-1] = '\0';
-				readingNMEA = false;
-				readingGPGGA = false;
-			}
-		}
-		else if(readingNMEA == true){
-			gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2);
-			if(gpsReadIterator == 4 ){
-				if(gpsReceiveString[3] == 'G'){
-					readingGPGGA = true;
-				}
-				else{
-					readingNMEA = false;
-				}
-			}
-		}
-		else if(USART_ReceiveData(USART2) == '$'){
+		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == '\n'){
+			gpsDataUpdated = true;
 			gpsReadIterator = 0;
-			readingNMEA = true;
 		}
 	}
-}*/
+}
 
 void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 {

@@ -14,6 +14,7 @@
 #include "USART2.h"
 
 //These are the Define statements
+#define GPS_PORTC GPIOC
 #define WAKEUP_PIN GPIO_Pin_3					//PC3
 #define RESET_PIN GPIO_Pin_2					//PC2
 #define ON_PIN GPIO_Pin_4						//PF4

@@ -64,10 +64,10 @@ char* Usart1_RecieveString(char* String){
 	return String;
 }
 
-char* Usart1_Recieve(void)
+char Usart1_Recieve(void)
 {
 	while(USART_GetFlagStatus(USART1,USART_FLAG_RXNE) == RESET);
-	return (char*)USART_ReceiveData(USART1);
+	return (char)USART_ReceiveData(USART1);
 }
 
 void ConfigureUsart1Interrupt(void)

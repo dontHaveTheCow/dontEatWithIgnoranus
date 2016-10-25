@@ -4,11 +4,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-/*
- * Test defines
- */
-#include <math.h>
-
 //debugging
 
 //My library includes
@@ -53,11 +48,10 @@
 //Measurment defines
 #define ACC_MEASUREMENT 0x00
 #define RSSI_MEASUREMENT 0x01
-#define GPS_MEASUREMENT 0x02
 
 //Xbee globals
 char xbeeReceiveBuffer[255];
-volatile bool dataUpdated = false;
+volatile bool xbeeDataUpdated = false;
 volatile uint8_t length,errorTimer,cheksum;
 bool xbeeReading = false;
 //DEWI globals
@@ -69,12 +63,18 @@ bool writingSD = false;
 bool counterIncremented = false;
 bool errorOnSomeNode = false;
 
+//Gps globals
+char gpsReceiveString[80];
+uint8_t gpsReadIterator;
+volatile bool gpsDataUpdated = false;
+
 struct node{
 	uint8_t adress[8];
-	int16_t measurment[3];	//0 -> ACC 1 -> RSSI 2 -> GPS
+	int16_t measurment[2];	//0 -> ACC 1 -> RSSI 2 -> GPS
 	uint8_t tmpRSSI;
 	uint32_t packetTime;
 	uint8_t avarageRSSIcount;
+	float velocity;
 	/*
 	 * if there is an error, bit is set to 1
 	 * alarm will be called if there are more then 1 bit set (sum is
@@ -103,6 +103,7 @@ int main(void)
 	receiverNode.adress[6] = 0xE1;
 	receiverNode.adress[7] = 0x3C;
 	receiverNode.state = 0;		//0 -> ACC 1 -> RSSI 2 -> GPS
+	receiverNode.velocity = 6.1; //Just some random
 
 	//Nodes
 	struct node node[NUMBER_OF_NODES];
@@ -157,7 +158,6 @@ int main(void)
 	node[3].errorByte = 0;
 	node[3].avarageRSSIcount = 0;
 	node[4].packetTime = 0;
-	uint8_t nodeCounter = 0;
 
 	//Usart for debugging and communication
 	Usart1_Init(9600);
@@ -166,6 +166,7 @@ int main(void)
 	//Led's and buttons
 	initializeXbeeATTnPin();
 	initializeUserButton();
+	setupGpsGpio();
 	initializeGreenLed1();
 	initializeGreenLed2();
 	initializeGreenLed3();
@@ -201,35 +202,25 @@ int main(void)
 	int n = 0;
 	//variables for RECIEVE_PACKET
 	uint8_t tmpNode;
-	char stringOfMessurement[5];
+	char stringOfMessurement[6];
 	//variables for gps
-/*	char* gpsPtr;
-	char* tmpGpsPtr;
+	char* ptr;
+	char* tmpPtr;
     char ts[11] = " ";
     char lat[11] = " ";
     char latd[2]= " ";
     char lon[11]= " ";
     char lond[2]= " ";
-    char fix[2]= " ";
+    char fix[2]= "0";
     char sats[3]= " ";
+    char velocityString[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
-
-
-    /*
-     * test variables
-     */
-	double lat1 = 56.979088;
-	double lon1 = 24.185272;
-	double lat2 = 56.980915;
-	double lon2 = 24.191795;
-	double R = 6378.137; // Radius of earth in KM
-	double dLat;
-	double dLon;
-	double a;
-	double c;
-	double d;
-
 	uint8_t messageIterator;
+	//Timer string
+	char timerString[8];
+	//Periph variable
+	uint16_t ADC_value;
+
 	//variables for sd card
 	//initialize sdcard (it uses the same SPI as Xbee)
 	uint8_t sdBuffer[512];
@@ -240,15 +231,12 @@ int main(void)
 	uint32_t filesize;
 	uint16_t fatSect, fsInfoSector;
 	char sdTmpWriteString[20];
-	//Timer string
-	char timerString[8];
-	//Periph variable
-	uint16_t ADC_value;
 
 	//read dump
-	dataUpdated =  xbeeStartupParamRead(ERROR_TIMER_COUNT,(uint8_t*)xbeeReceiveBuffer);
+	xbeeDataUpdated = xbeeStartupParamRead(ERROR_TIMER_COUNT,(uint8_t*)xbeeReceiveBuffer);
 
 	//Dewi Module wont start until the button is pressed
+	SEND_SERIAL_MSG("Waiting for input...\r\n");
 	while(moduleStatus == MODULE_NOT_RUNNING){
     	ADC_value = (ADC_GetConversionValue(ADC1));
     	ADC_value = (ADC_value * 330) / 128;
@@ -256,8 +244,8 @@ int main(void)
     	blinkGreenLeds(i++);
     	if(i > 7)
     		i = 1;
-	}
 
+	}
 	//12 seconds to choose the modules to use
 	//One redStartup take about 500ms, so let it spin for twenty times
 	//Default state is 1 (only acc is on)
@@ -280,13 +268,81 @@ int main(void)
 			delayMs(1000);
 			blinkRedLed3();
 		}
+		SEND_SERIAL_MSG("Accelerometer ready!!!\r\n");
 	}
 
 	//GPS
 	if((state&0x02) >> 1){
-		//turnGpsOn();
-		//while(gpsReceiveString[])
+		//Usart 2 for gps communication
+		Usart2_Init(BAUD_4800);
+		ConfigureUsart2Interrupt();
+		errorTimer = 50;
+
+		//Wait for enough satellites
+		SEND_SERIAL_MSG("Initializing gps...\r\n");
+
+		turnGpsOn();
+
+		//Make sure that gps module has waken up
+		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN) && errorTimer-- > 0){
+			blinkRedLed4();
+			delayMs(1000);
+		}
+
+		delayMs(400);
 		blinkRedLed4();
+		gps_dissableMessage($GPVTG);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPGSV);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPRMC);
+		delayMs(400);
+		blinkRedLed4();
+		gps_setRate($GPGGA, 1);
+		delayMs(400);
+		blinkRedLed4();
+		gps_dissableMessage($GPGSA);
+
+		//Wait for enough satellites
+		SEND_SERIAL_MSG("Searching for satellites...\r\n");
+		while(fix[0] == '0' && errorTimer > 0 ){
+			if(gpsDataUpdated){
+				errorTimer--;
+				gpsDataUpdated = false;
+				messageIterator = 0;
+				/*
+				 * Make sure that you are comparing GPGGA message
+				 * $PSRF and $GPVTG messages are possable at the startup
+				 */
+				if(strncmp(gpsReceiveString,"$GPGGA", 6) == 0){
+					ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
+					for(; messageIterator < 7; messageIterator ++){
+						tmpPtr = ptrToNMEA[messageIterator];
+						while(*ptr++ != ','){
+							*ptrToNMEA[messageIterator]++ = *(ptr-1);
+						}
+						ptrToNMEA[messageIterator] = tmpPtr;
+					}
+				}
+				blinkRedLed4();
+			}
+		}
+		//if not enough satellites are found, turn off gps
+		if(!errorTimer){
+			SEND_SERIAL_MSG("Satellites not found!!!\r\n");
+			hibernateGps();
+			state &= 0xFD;
+		}
+		else{
+			//if satellites found -> turn on $GPVTG to monitor velocity
+			gps_dissableMessage($GPGGA);
+			delayMs(400);
+			blinkRedLed4();
+			gps_setRate($GPVTG, 1);
+			SEND_SERIAL_MSG("GPS ready!!!\r\n");
+		}
 	}
 
 	//initialize sdCard
@@ -321,6 +377,7 @@ int main(void)
 
 	moduleStatus = MODULE_IDLE_READY;
 	turnOnGreenLeds(state);
+	SEND_SERIAL_MSG("Coordinator ready!!!\r\n");
 	while(moduleStatus == MODULE_IDLE_READY){
 		blinkGreenLeds(state);
 		redStartup(DELAY);
@@ -328,10 +385,11 @@ int main(void)
 
 	while(1)
     {
-    	if(dataUpdated == true){
+    	if(xbeeDataUpdated == true){
     		typeOfFrame = xbeeReceiveBuffer[0];
     		switch(typeOfFrame){
     			case AT_COMMAND_RESPONSE:
+    			SEND_SERIAL_MSG("AT_COMAND_RESPONSE...\r\n");
 
 				frameID = xbeeReceiveBuffer[1];
 				//xbeeReceiveBuffer[2];	//TYPE OF AT COMMAND
@@ -442,7 +500,7 @@ int main(void)
 							GPIOB->ODR |= (1 << (5+tmpNode -1));
 						}
 						else{
-							//indicate that one of the five nodes received packet was alright
+							//indicate that one of the five nodes received packet was goof
 							GPIOC->ODR &=~ 7 << 6;
 							GPIOB->ODR ^= (1 << (5+tmpNode -1));
 						}
@@ -453,9 +511,10 @@ int main(void)
 						AT_data[i - 5] = xbeeReceiveBuffer[i];
 					}
 				}
-				dataUpdated = false;				//Mark packet as read
+				xbeeDataUpdated = false;				//Mark packet as read
 				break;
 			case RECIEVE_PACKET:
+				//SEND_SERIAL_MSG("PACKET_RECEIVED...\r\n");
 
 				i = 1;	//Remember that "Frame type" byte was the first one
 				uint8_t eightByteSourceAdress[8]; //64 bit
@@ -475,61 +534,38 @@ int main(void)
 				//Read the typeOfMessurement
 				node[tmpNode].state = xbeeReceiveBuffer[i++] - 0x30;	//Calculate the integer from ASCII by subtracting 0x30
 
+				/*
+				 * State (type of measurement) from another node is separated
+				 * with whitespace from actual measurement data
+				 */
 				i++;
-				//Read the recievedMessurement(data from sensors)
+
 				n = 0;
 				while (xbeeReceiveBuffer[i] != '\0'){
 					stringOfMessurement[n++] = xbeeReceiveBuffer[i];
 					i++;
 				}
-				stringOfMessurement[n] = '\0';
-				node[tmpNode].measurment[node[tmpNode].state] = atoi(stringOfMessurement);
+				stringOfMessurement[n] = xbeeReceiveBuffer[i];
+
+				//node[tmpNode].measurment[node[tmpNode].state] = atoi(stringOfMessurement);
 				//printf("node:%d\tFriendState:%d\tdata:%d\n", tmpNode, node[tmpNode].state, node[tmpNode].measurment[node[tmpNode].state]);
 
-					switch(node[tmpNode].state){
+/*				SEND_SERIAL_BYTE(node[tmpNode].state + ASCII_DIGIT_OFFSET);
+				SEND_SERIAL_BYTE(' ');
+				SEND_SERIAL_MSG(stringOfMessurement);
+				SEND_SERIAL_MSG(" Received string\r\n");*/
+
+				switch(node[tmpNode].state){
 					case 0:
+						node[tmpNode].measurment[ACC_MEASUREMENT] = atoi(stringOfMessurement);
+						receiverNode.measurment[ACC_MEASUREMENT] = returnX_axis();
 
-						XBEE_CS_LOW();
-						SPI1_TransRecieve('S');
-						SPI1_TransRecieve('T');
-						SPI1_TransRecieve('A');
-						SPI1_TransRecieve('R');
-						SPI1_TransRecieve('T');
-						XBEE_CS_HIGH();
-
-						/*
-						 * read the gps value of receiver
-						 * compare it with received value from node
-						 * decide for errorByte 3lsb value
-						 */
-						//askModuleParams('D','B',tmpNode+1);
-
-						dLat = lat2 * M_PI / 180 - lat1 * M_PI / 180;
-						dLon = lon2 * M_PI / 180 - lon1 * M_PI / 180;
-						a = sin(dLat/2) * sin(dLat/2) + cos(lat1 * M_PI / 180) * cos(lat2 * M_PI / 180) * sin(dLon/2) * sin(dLon/2);
-						c = 2 * atan2(sqrt(a), sqrt(1-a));
-						d = R * c;
-						d  = d * 1000; // meters
-
-						XBEE_CS_LOW();
-						SPI1_TransRecieve('F');
-						SPI1_TransRecieve('I');
-						SPI1_TransRecieve('N');
-						SPI1_TransRecieve('I');
-						SPI1_TransRecieve('S');
-						SPI1_TransRecieve('H');
-						SPI1_TransRecieve('E');
-						SPI1_TransRecieve('D');
-						XBEE_CS_HIGH();
-
-/*						receiverNode.measurment[0] = returnX_axis();
-
-						if(abs(receiverNode.measurment[0] - node[tmpNode].measurment[0]) > 120)
+						if(abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]) > 120)
 							node[tmpNode].errorByte |= 0x01;
 
 							//add sd card accelerometer error code
 						else {
-							node[tmpNode].errorByte &= 0x02;
+							node[tmpNode].errorByte &= 0x06;
 							//if sd card is in use, log to it
 							if(((state&0x04) >> 2)){
 								writingSD = true;
@@ -542,71 +578,47 @@ int main(void)
 						node[tmpNode].packetTime = globalCounter;
 
 						//after receiving acc measurement, ask module for last packets rssi
-
-						askModuleParams('D','B',tmpNode+1);*/
+						askModuleParams('D','B',tmpNode+1);
 						break;
 					case 1:
 
-/*						XBEE_CS_LOW();
-						SPI1_TransRecieve('S');
-						SPI1_TransRecieve('T');
-						SPI1_TransRecieve('A');
-						SPI1_TransRecieve('R');
-						SPI1_TransRecieve('T');
-						XBEE_CS_HIGH();
+						node[tmpNode].velocity = atof(stringOfMessurement);
+						if(gpsDataUpdated){
+							gps_parseGPVTG(gpsReceiveString,velocityString);
+							receiverNode.velocity = atof(velocityString);
+						}
 
+						if(abs(receiverNode.velocity - node[tmpNode].velocity) > 10){
+							node[tmpNode].errorByte |= 0x04;
+						}
+						else{
+							node[tmpNode].errorByte &= 0x03;
+						}
 
-						 * read the gps value of receiver
-						 * compare it with received value from node
-						 * decide for errorByte 3lsb value
-
-						//askModuleParams('D','B',tmpNode+1);
-
-						double lat1 = 56.979088;
-						double lon1 = 24.185272;
-						double lat2 = 56.980915;
-						double lon2 = 24.191795;
-
-						double R = 6378.137; // Radius of earth in KM
-						double dLat = lat2 * M_PI / 180 - lat1 * M_PI / 180;
-						double dLon = lon2 * M_PI / 180 - lon1 * M_PI / 180;
-						double a = sin(dLat/2) * sin(dLat/2) + cos(lat1 * M_PI / 180) * cos(lat2 * M_PI / 180) * sin(dLon/2) * sin(dLon/2);
-						double c = 2 * atan2(sqrt(a), sqrt(1-a));
-						double d = R * c;
-						d  = d * 1000; // meters
-
-						XBEE_CS_LOW();
-						SPI1_TransRecieve('F');
-						SPI1_TransRecieve('I');
-						SPI1_TransRecieve('N');
-						SPI1_TransRecieve('I');
-						SPI1_TransRecieve('S');
-						SPI1_TransRecieve('H');
-						SPI1_TransRecieve('E');
-						SPI1_TransRecieve('D');
-						XBEE_CS_HIGH();*/
-
+						//after receiving gps measurement, ask module for last packets rssi
+						askModuleParams('D','B',tmpNode+1);
 						break;
 					}
 				break;
 			case MODEM_STATUS:
+				SEND_SERIAL_MSG("MODEM STATUS...\r\n");
 				//blinkAllRed();
 				if(xbeeReceiveBuffer[1] == 0x00){
-					//DEBUG_MESSAGE("*ModemStatus - Hardware reset*\n");
+					SEND_SERIAL_MSG("HARDWARE RESET...\r\n");
 				}
 				break;
 			default:
-				//FUCK: There was another type of packet
+				SEND_SERIAL_MSG("UNKNOWN PACKET...\r\n");
 				break;
     		}
-    		dataUpdated = false;
+    		xbeeDataUpdated = false;
     	}
 
     	/*
     	 * If the data was not read in the interrupt (sd in use for ex.)
     	 * Then read it in while loop after the interrupt
     	 */
-    	else if(xbeeReading == false  && !GPIO_ReadInputDataBit(GPIOC,GPIO_Pin_4) && dataUpdated == false){
+    	else if(xbeeReading == false  && !GPIO_ReadInputDataBit(GPIOC,GPIO_Pin_4) && xbeeDataUpdated == false){
 
     		errorTimer, cheksum = 0;
     		xbeeReading = true;
@@ -628,7 +640,7 @@ int main(void)
 				}
 				cheksum += SPI1_TransRecieve(0x00);
 				if(cheksum == 0xFF){
-					dataUpdated = true;
+					xbeeDataUpdated = true;
 				}
 				//printf("Checksum:%d\n",cheksum);
 				//Data is updated if checksum is true
@@ -658,7 +670,7 @@ int main(void)
     			sdIdleState();
     		}
     		if((state&0x02) >> 1){
-    			//hibernateGps();
+    			hibernateGps();
     		}
     		errorOnSomeNode = false;
 			GPIOC->ODR &=~ 7 << 6;
@@ -674,7 +686,7 @@ int main(void)
     	 * Routine for checking timer error
     	 *  (if node isnt disconected)
     	 */
-    	if(counterIncremented == true ){
+ /*   	if(counterIncremented == true ){
     		for(nodeCounter = 0; nodeCounter < NUMBER_OF_NODES; nodeCounter++){
     			//check if node has received any packet
     			if(node[nodeCounter].packetTime > 0){
@@ -698,8 +710,17 @@ int main(void)
 				PWM_PULSE_LENGHT(0);
 			}
     		counterIncremented = false;
-    	}
+    	}*/
     }
+}
+
+void USART2_IRQHandler(void){
+	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
+		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == '\n'){
+			gpsDataUpdated = true;
+			gpsReadIterator = 0;
+		}
+	}
 }
 
 void EXTI4_15_IRQHandler(void)					//External interrupt handlers
@@ -750,7 +771,7 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 				xbeeReceiveBuffer[i] = '\0';
 				cheksum += SPI1_TransRecieve(0x00);
 				if(cheksum == 0xFF)
-					dataUpdated = true;					//Data is updated if checksum is true
+					xbeeDataUpdated = true;					//Data is updated if checksum is true
 				xbeeReading = false;
 				GPIO_SetBits(GPIOA,GPIO_Pin_4);
 			}

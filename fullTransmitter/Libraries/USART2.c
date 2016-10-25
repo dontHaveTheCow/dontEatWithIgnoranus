@@ -45,7 +45,7 @@ void Usart2_Send(uint8_t data)
 
 void Usart2_SendString(char* string){
 	while(*string != 0){
-		Usart2Send(*string++);
+		Usart2_Send(*string++);
 	}
 }
 

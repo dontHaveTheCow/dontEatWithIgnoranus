@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include "IndicationGPIOs.h"
 
+#define SEND_SERIAL_MSG Usart1_SendString
+
 //These are the prototypes for the routines
 void Usart1_Init(int baudrate);
 void Usart1_Send(uint8_t data);

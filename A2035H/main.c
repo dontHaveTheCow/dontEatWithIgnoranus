@@ -46,6 +46,7 @@ int main(void)
 	initialiseSysTick();
 	initializeRedLed1();
 	initializeRedLed2();
+	initializeRedLed4();
 	initializeGreenLed1();
 	initializeUserButton();
 	//initializeDiscoveryLeds();
@@ -56,60 +57,57 @@ int main(void)
 
 	turnGpsOn();
 
+	while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN)){
+		blinkRedLed2();
+		delayMs(1000);
+	}
+
+
 	delayMs(400);
-	blinkRedLed2();
 	gps_dissableMessage($GPGSA);
 	delayMs(400);
-	blinkRedLed2();
 	gps_dissableMessage($GPGSV);
 	delayMs(400);
-	blinkRedLed2();
 	gps_dissableMessage($GPRMC);
-	gpsIsOn = true;
 
-	//Wait until there is an satellite connection
-	while(fix[0] == '0'){
-		if(gpsDataUpdated){
-			gpsDataUpdated = false;
-			messageIterator = 0;
-			ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
-			for(; messageIterator < 7; messageIterator ++){
-				tmpPtr = ptrToNMEA[messageIterator];
-				while(*ptr++ != ','){
-					*ptrToNMEA[messageIterator]++ = *(ptr-1);
-				}
-				ptrToNMEA[messageIterator] = tmpPtr;
-			}
-			blinkRedLed1();
-    		Usart1_Send('\n');
-    		Usart1_SendString(ts);
-    		Usart1_SendString(" No GPS fix\r\n");
-		}
-	}
+	gpsIsOn = true;
 
     while(1){
     	if(gpsDataUpdated){
     		gpsDataUpdated = false;
     		messageIterator = 0;
-    		ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
-    	    for(; messageIterator < 7; messageIterator ++){
-    	    	tmpPtr = ptrToNMEA[messageIterator];
-    	        while(*ptr++ != ','){
-    	            *ptrToNMEA[messageIterator]++ = *(ptr-1);
-    	        }
-    	        ptrToNMEA[messageIterator] = tmpPtr;
-    	    }
+    		if(strncmp(gpsReceiveString,"$GPGGA", 6) == 0){
+        		ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
+        	    for(; messageIterator < 7; messageIterator ++){
+        	    	tmpPtr = ptrToNMEA[messageIterator];
+        	        while(*ptr++ != ','){
+        	            *ptrToNMEA[messageIterator]++ = *(ptr-1);
+        	        }
+        	        ptrToNMEA[messageIterator] = tmpPtr;
+        	    }
+        	    if(fix[0] == '0'){
+        	    	Usart1_Send('\n');
+            		Usart1_SendString(ts);
+            		Usart1_SendString(" No GPS fix\r\n");
+        	    }
+        	    else{
+        	    	Usart1_Send('\n');
+            		Usart1_SendString(ts);
+            		Usart1_SendString(" GPS Found\r\n");
 
-    	    if(fix[0] == '0'){
-        		Usart1_Send('\n');
-        		Usart1_SendString(ts);
-        		Usart1_SendString(" No GPS fix\r\n");
-    	    }
-    	    else{
-        		Usart1_SendString(gpsReceiveString);
-        		Usart1_Send('\r');
-        		Usart1_Send('\n');
-    	    }
+            		gps_dissableMessage($GPGGA);
+            		delayMs(400);
+            		gps_setRate($GPVTG,1);
+        	    }
+    		}
+    		else if(strncmp(gpsReceiveString,"$GPVTG" , 6) == 0){
+    			gps_parseGPVTG(gpsReceiveString,velocity);
+    			Usart1_SendString(" Velocity: ");
+    			Usart1_SendString(velocity);
+    		}
+    		else{
+    			Usart1_SendString(gpsReceiveString);
+    		}
     	    GPIOC->ODR ^= GPIO_Pin_6;
     	}
     	if(gpsTurnOff == true){
@@ -148,7 +146,7 @@ void USART2_IRQHandler(void){
 /*		Usart1_Send(USART_ReceiveData(USART2));
 		GPIOC->ODR ^= GPIO_Pin_6;*/
 
-		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == 0x0D){
+		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == '\n'){
 			gpsDataUpdated = true;
 			gpsReadIterator = 0;
 		}
