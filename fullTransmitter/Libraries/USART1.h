@@ -10,6 +10,7 @@
 #include "IndicationGPIOs.h"
 
 #define SEND_SERIAL_MSG Usart1_SendString
+#define SEND_SERIAL_BYTE Usart1_Send
 
 //These are the prototypes for the routines
 void Usart1_Init(int baudrate);

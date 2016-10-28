@@ -44,6 +44,8 @@
 #define MODULE_IDLE_READY 0x0C
 #define MODULE_RUNNING 0x08
 #define MODULE_TURNING_OFF 0x10
+#define ACC_STATE_CASE 0x00
+#define GPS_STATE_CASE 0x01
 
 //Measurment defines
 #define ACC_MEASUREMENT 0x00
@@ -103,7 +105,7 @@ int main(void)
 	receiverNode.adress[6] = 0xE1;
 	receiverNode.adress[7] = 0x3C;
 	receiverNode.state = 0;		//0 -> ACC 1 -> RSSI 2 -> GPS
-	receiverNode.velocity = 6.1; //Just some random
+	receiverNode.velocity = 0.1;
 
 	//Nodes
 	struct node node[NUMBER_OF_NODES];
@@ -187,7 +189,7 @@ int main(void)
 	adcPinConfig();
 	adcConfig();
 
-	//Xbee (radio)
+	// SPI for xbee and sdcard
 	InitialiseSPI1_GPIO();
 	InitialiseSPI1();
 	//packet variables
@@ -348,6 +350,8 @@ int main(void)
 	//initialize sdCard
 	if((state&0x04) >> 2){
 
+		SEND_SERIAL_MSG("Initializing sd card...\r\n");
+
 		errorTimer = 10;
 		while(!initializeSD() && errorTimer-- > 1){
 			delayMs(300);
@@ -356,9 +360,9 @@ int main(void)
 		if(!errorTimer){
 			//If sd card doesnt turn on, dont log anything to it
 			state &= 0xFB;
+			SEND_SERIAL_MSG("Sd card fail...\r\n");
 		}
 		else{
-			blinkGreenLed1();
 			writingSD = true;
 
 			findDetailsOfFAT(sdBuffer,&fatSect,&mstrDir, &fsInfoSector);
@@ -372,6 +376,8 @@ int main(void)
 
 			appendTextToTheSD("\nNEW LOG", '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
 			writingSD = false;
+
+			SEND_SERIAL_MSG("Sd card initialized...\r\n");
 		}
 	}
 
@@ -389,7 +395,6 @@ int main(void)
     		typeOfFrame = xbeeReceiveBuffer[0];
     		switch(typeOfFrame){
     			case AT_COMMAND_RESPONSE:
-    			SEND_SERIAL_MSG("AT_COMAND_RESPONSE...\r\n");
 
 				frameID = xbeeReceiveBuffer[1];
 				//xbeeReceiveBuffer[2];	//TYPE OF AT COMMAND
@@ -468,16 +473,14 @@ int main(void)
 							sdTmpWriteString[4] = ' ';
 							sdTmpWriteString[5] = frameID -1 + ASCII_DIGIT_OFFSET;
 							sdTmpWriteString[6] = ' ';
-							sdTmpWriteString[7] = 'A';
-							sdTmpWriteString[8] = 'V';
-							sdTmpWriteString[9] = 'R';
-							sdTmpWriteString[10] = 'S';
-							sdTmpWriteString[11] = 'S';
-							sdTmpWriteString[12] = 'I';
-							sdTmpWriteString[13] = ':';
-							sdTmpWriteString[14] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] / 10) + ASCII_DIGIT_OFFSET;
-							sdTmpWriteString[15] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] % 10) + ASCII_DIGIT_OFFSET;
-							sdTmpWriteString[16] = '\0';
+							sdTmpWriteString[7] = 'R';
+							sdTmpWriteString[8] = 'S';
+							sdTmpWriteString[9] = 'S';
+							sdTmpWriteString[10] = 'I';
+							sdTmpWriteString[11] = ':';
+							sdTmpWriteString[12] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] / 10) + ASCII_DIGIT_OFFSET;
+							sdTmpWriteString[13] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] % 10) + ASCII_DIGIT_OFFSET;
+							sdTmpWriteString[14] = '\0';
 							//Firstly check if you wont overwrite the buffer
 							writingSD = true;
 							appendTextToTheSD(sdTmpWriteString,'\n',&sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
@@ -485,25 +488,28 @@ int main(void)
 						}
 					}
 					/*
-						 * *** ERROR CHECKING ROUTINE ***
-						 *
-						 * Error is checked after reading the RSSI value
-						 * Node's id is stored in AT packets frame_id value
-						 *
-						 * Last 3 bits of errorByte represents gps,rssi and acc error
-						 *
-						 * For now, if more then one sensor reads danger value, the alarm routine is called
-						 */
-						if((node[frameID -1].errorByte & 0x01)+((node[frameID -1].errorByte >> 1)&0x01)+(node[frameID -1].errorByte >> 2) > 0){
+					 * *** ERROR CHECKING ROUTINE ***
+					 *
+					 * Error is checked after reading the RSSI value
+					 * Node's id is stored in AT packets frame_id value
+					 *
+					 * Last 3 bits of errorByte represents gps,rssi and acc error
+					 *
+					 * If more then one sensor reads danger value, the alarm routine is called
+					 *
+					 * Blinking means that received measurement was good
+					 * Solid light means error
+					 */
 
-							GPIOC->ODR |= 7 << 6;
-							GPIOB->ODR |= (1 << (5+tmpNode -1));
-						}
-						else{
-							//indicate that one of the five nodes received packet was goof
-							GPIOC->ODR &=~ 7 << 6;
-							GPIOB->ODR ^= (1 << (5+tmpNode -1));
-						}
+					if((node[frameID-1].errorByte & 0x01)+((node[frameID-1].errorByte >> 1)&0x01)+(node[frameID-1].errorByte >> 2) > 0){
+
+						GPIOB->ODR |= (1 << (5+tmpNode -1));
+						//SEND_SERIAL_MSG("DANGER\r\n");
+					}
+					else{
+						//indicate that one of the five nodes received packet was good
+						GPIOB->ODR ^= (1 << (5+tmpNode -1));
+					}
 				}
 				else{
 					i = 5;
@@ -547,23 +553,28 @@ int main(void)
 				}
 				stringOfMessurement[n] = xbeeReceiveBuffer[i];
 
-				//node[tmpNode].measurment[node[tmpNode].state] = atoi(stringOfMessurement);
-				//printf("node:%d\tFriendState:%d\tdata:%d\n", tmpNode, node[tmpNode].state, node[tmpNode].measurment[node[tmpNode].state]);
+				//Measure the time when packet was received
+				node[tmpNode].packetTime = globalCounter;
 
-/*				SEND_SERIAL_BYTE(node[tmpNode].state + ASCII_DIGIT_OFFSET);
+/*				SEND_SERIAL_BYTE(node[tmpNode].state + 0x30);
 				SEND_SERIAL_BYTE(' ');
 				SEND_SERIAL_MSG(stringOfMessurement);
-				SEND_SERIAL_MSG(" Received string\r\n");*/
+				SEND_SERIAL_MSG(":Received\r\n");*/
 
 				switch(node[tmpNode].state){
-					case 0:
+					case ACC_STATE_CASE:
 						node[tmpNode].measurment[ACC_MEASUREMENT] = atoi(stringOfMessurement);
 						receiverNode.measurment[ACC_MEASUREMENT] = returnX_axis();
 
-						if(abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]) > 120)
+						if(abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]) > 120){
 							node[tmpNode].errorByte |= 0x01;
-
 							//add sd card accelerometer error code
+							if(((state&0x04) >> 2)){
+								writingSD = true;
+								appendTextToTheSD(stringOfMessurement, ' ',&sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+								writingSD = false;
+							}
+						}
 						else {
 							node[tmpNode].errorByte &= 0x06;
 							//if sd card is in use, log to it
@@ -574,28 +585,40 @@ int main(void)
 							}
 						}
 
-						//Measure the time when packet was received
-						node[tmpNode].packetTime = globalCounter;
-
 						//after receiving acc measurement, ask module for last packets rssi
 						askModuleParams('D','B',tmpNode+1);
 						break;
-					case 1:
 
-						node[tmpNode].velocity = atof(stringOfMessurement);
+					case GPS_STATE_CASE:
+						node[tmpNode].velocity = stof(stringOfMessurement);
 						if(gpsDataUpdated){
+							gpsDataUpdated = false;
 							gps_parseGPVTG(gpsReceiveString,velocityString);
-							receiverNode.velocity = atof(velocityString);
+							receiverNode.velocity = stof(velocityString);
 						}
 
-						if(abs(receiverNode.velocity - node[tmpNode].velocity) > 10){
+						if(abs(receiverNode.velocity - node[tmpNode].velocity) > 5){
 							node[tmpNode].errorByte |= 0x04;
+
+							//Error was measured - log it to sd card
+							if(((state&0x04) >> 2)){
+								writingSD = true;
+								appendTextToTheSD(stringOfMessurement, ' ',&sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+								writingSD = false;
+							}
 						}
 						else{
 							node[tmpNode].errorByte &= 0x03;
-						}
 
+							//If sd card is in use, log data to it
+							if(((state&0x04) >> 2)){
+									writingSD = true;
+									appendTextToTheSD(stringOfMessurement, ' ',&sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+									writingSD = false;
+								}
+						}
 						//after receiving gps measurement, ask module for last packets rssi
+
 						askModuleParams('D','B',tmpNode+1);
 						break;
 					}

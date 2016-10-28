@@ -62,13 +62,16 @@ int main(void)
 		delayMs(1000);
 	}
 
-
 	delayMs(400);
 	gps_dissableMessage($GPGSA);
 	delayMs(400);
 	gps_dissableMessage($GPGSV);
 	delayMs(400);
 	gps_dissableMessage($GPRMC);
+	delayMs(400);
+	gps_dissableMessage($GPVTG);
+	delayMs(400);
+	gps_setRate($GPGGA, 1);
 
 	gpsIsOn = true;
 

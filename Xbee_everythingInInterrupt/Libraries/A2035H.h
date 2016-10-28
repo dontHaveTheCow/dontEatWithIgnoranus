@@ -46,4 +46,7 @@ void gps_disable5hz(void);
 void gps_parseGPGGA(char* gpsString, char* ts, char* lat, char* lon, char* fix, char* sats);
 void gps_parseGPVTG(char* gpsString, char* speed);
 
+//String to floating point conversation function
+float stof(const char* s);
+
 #endif

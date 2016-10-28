@@ -1,15 +1,14 @@
 #include "A2035H.h"
 
 void turnGpsOn(void){
-
-	GPIO_ResetBits(GPIOC, RESET_PIN);
-	delayMs(200);
-	GPIO_SetBits(GPIOC, RESET_PIN);
-	//Set on pin
-	delay_1s();
-	GPIO_SetBits(GPIOF, ON_PIN);
-	delayMs(200);
-	GPIO_ResetBits(GPIOF, ON_PIN);
+		GPIO_ResetBits(GPIOC, RESET_PIN);
+		delayMs(200);
+		GPIO_SetBits(GPIOC, RESET_PIN);
+		//Set on pin
+		delay_1s();
+	    GPIO_SetBits(GPIOF, ON_PIN);
+	    delayMs(200);
+		GPIO_ResetBits(GPIOF, ON_PIN);
 }
 void hibernateGps(void){
 
@@ -49,6 +48,7 @@ void setupGpsGpio(void){
 }
 
 //RCC_APB1Periph_TIM3 is used for speaker pwm - dont use that!!!
+//okkk i will use RCC_APB1Periph_TIM2
 void setupGpsTimer(void){
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 	TIM_TimeBaseInitTypeDef Timer_init_structure;

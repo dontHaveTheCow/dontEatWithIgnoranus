@@ -287,11 +287,13 @@ void findLastClusterOfFile(char* filename, uint8_t *buff, uint32_t *cluster, uin
 	/* Refer to the comment in findNextClusterOfFile() function */
 
 	//Right now, the buffer is filled with master directory sector
-	//When you have found the first cluster, fill the buffer with FAT sector
+	//The first cluster should be found, so
+	//fill the buffer with FAT sector
 	delayMs(1);
 	read_datablock(buff,_fat);
 
-	while(tmpCluster != 0x0FFFFFFF){
+	//old value -> 0x0FFFFFFF
+	while(tmpCluster != 0xFFFFFFF){
 	//while(tmpCluster != 0x00000080){
 		lastCluster = tmpCluster;
 		tmpCluster = buff[(lastCluster%0x80)*4]

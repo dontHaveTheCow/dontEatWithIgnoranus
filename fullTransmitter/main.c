@@ -88,12 +88,11 @@ int main(void){
 	//initialize sdcard (it uses the same SPI as Xbee)
 	uint8_t sdBuffer[512];
 	uint16_t sdBufferCurrentSymbol = 0;
-	uint8_t sector;
-	uint32_t mstrDir;
-	uint32_t cluster;
-	uint32_t filesize;
+	uint8_t sector = 0;
+	uint32_t mstrDir = 0;
+	uint32_t cluster = 0;
+	uint32_t filesize = 0;
 	uint16_t fatSect, fsInfoSector;
-	uint8_t sdStatus = 0x00;
 	//Periph variable
 	uint16_t ADC_value;
 	//Timer string
@@ -164,44 +163,39 @@ int main(void){
 
 	//GPS
 	if((state&0x02) >> 1){
-/*		//Usart 2 for gps communication
+		//Usart 2 for gps communication
 		Usart2_Init(BAUD_4800);
 		ConfigureUsart2Interrupt();
 		errorTimer = 40;
 
 		turnGpsOn();
 
-		//Make sure that gps module has waken up
-		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN) && errorTimer-- > 0){
-			blinkRedLed4();
+		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN)){
+			blinkRedLed2();
 			delayMs(1000);
 		}
 
 		delayMs(400);
-		blinkRedLed4();
-		gps_dissableMessage($GPVTG);
+		gps_dissableMessage($GPGSA);
 		delayMs(400);
-		blinkRedLed4();
 		gps_dissableMessage($GPGSV);
 		delayMs(400);
-		blinkRedLed4();
 		gps_dissableMessage($GPRMC);
 		delayMs(400);
-		blinkRedLed4();
-		gps_setRate($GPGGA, 1);
+		gps_dissableMessage($GPVTG);
 		delayMs(400);
-		blinkRedLed4();
-		gps_dissableMessage($GPGSA);
+		gps_setRate($GPGGA, 1);
 
 		//Wait for enough satellites
-		while(fix[0] == '0' && errorTimer > 0 ){
+/*		while(fix[0] == '0' && errorTimer > 0 ){
 			if(gpsDataUpdated){
 				errorTimer--;
 				gpsDataUpdated = false;
 				messageIterator = 0;
 
-				 * Make sure that you are comparing GPGGA message
+				  Make sure that you are comparing GPGGA message
 				 * $PSRF and $GPVTG messages are possable at the startup
+
 
 				if(strncmp(gpsReceiveString,"$GPGGA", 6) == 0){
 					ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
@@ -216,7 +210,7 @@ int main(void){
 				SEND_SERIAL_MSG("Waiting for sats...\r\n");
 				blinkRedLed4();
 			}
-		}
+		}*/
 		//if not enough satellites are found, turn off gps
 		if(!errorTimer){
 			SEND_SERIAL_MSG("GPS timeout...\r\n");
@@ -225,12 +219,13 @@ int main(void){
 		}
 		else{
 			//if satellites found -> turn on $GPVTG to monitor velocity
-			gps_dissableMessage($GPGGA);
+/*			delayMs(400);
+			gps_setRate($GPVTG,1);
 			delayMs(400);
 			blinkRedLed4();
-			gps_setRate($GPVTG, 1);
+			gps_dissableMessage($GPGGA);*/
 			SEND_SERIAL_MSG("SATs found...\r\n");
-		}*/
+		}
 	}
 	//SD
 	if((state&0x04) >> 2){
@@ -245,12 +240,35 @@ int main(void){
 			state &= 0xFB;
 		}
 		else{
-			blinkGreenLed1();
 
 			findDetailsOfFAT(sdBuffer,&fatSect,&mstrDir, &fsInfoSector);
-
 			findDetailsOfFile("LOGFILE",sdBuffer,mstrDir,&filesize,&cluster,&sector);
 
+			SEND_SERIAL_BYTE(errorTimer+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":ERROR_TIMER\r\n");
+			SEND_SERIAL_BYTE(filesize+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":FILESIZE\r\n");
+			SEND_SERIAL_BYTE(sector+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":SECTOR\r\n");
+			SEND_SERIAL_BYTE(cluster+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":CLUSTER\r\n");
+			SEND_SERIAL_BYTE((fatSect%10000)/1000+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((fatSect%1000)/100+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((fatSect%100)/10+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((fatSect%10)+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":FAT_SECT\r\n");
+			SEND_SERIAL_BYTE((mstrDir%100000)/10000+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((mstrDir%10000)/1000+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((mstrDir%1000)/100+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((mstrDir%100)/10+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_BYTE((mstrDir%10)+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":MSTR_DIR\r\n");
+			SEND_SERIAL_BYTE(fsInfoSector+ASCII_DIGIT_OFFSET);
+			SEND_SERIAL_MSG(":FS_INFO_SECT\r\n");
+
+			/*
+			 * Program halts during this function
+			 */
 			findLastClusterOfFile("LOGFILE",sdBuffer, &cluster,fatSect,mstrDir);
 
 			if(filesize < 512)
@@ -286,7 +304,7 @@ int main(void){
     			if((state&0x04) >> 2){
     				itoa(globalCounter,timerString);
     				appendTextToTheSD(timerString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
-    				appendTextToTheSD(transmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				appendTextToTheSD(transmitString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
     			}
     			xorGreenLed(0);
@@ -300,11 +318,17 @@ int main(void){
     			else{
     				strcpy(velocity,"999.9");
     			}
+    			SEND_SERIAL_MSG(gpsReceiveString);
+    			SEND_SERIAL_MSG(":GPS\r\n");
        		    transmitString[0] = '1';
         		transmitString[1] = ' ';
         		strcpy(&transmitString[2],velocity);
-
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+
+    			if((state&0x04) >> 2){
+    				appendTextToTheSD(transmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				xorGreenLed(2);
+    			}
     			SEND_SERIAL_MSG(transmitString);
     			SEND_SERIAL_MSG(" MESSAGE_SENT\r\n");
     			xorGreenLed(1);
@@ -346,6 +370,7 @@ void USART2_IRQHandler(void){
 			gpsDataUpdated = true;
 			gpsReadIterator = 0;
 		}
+
 	}
 }
 
