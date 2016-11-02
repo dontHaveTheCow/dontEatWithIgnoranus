@@ -1,12 +1,15 @@
-//Stm32 includes and C libraries
-#include<stm32f0xx.h>
-#include <string.h>
-#include <stdbool.h>
+/*
+ * STM32 and C libraries
+ */
+#include <stm32f0xx.h>
+#include <stm32f0xx_gpio.h>
+#include <stm32f0xx_rcc.h>
+#include <stm32f0xx_exti.h>
 
-//Debugging
-#include "debug.h"
-
-//My library includes
+#include "stdbool.h"
+/*
+ * DEW| libraries
+ */
 #include "SPI1.h"
 #include "SPI2.h"
 #include "SysTickDelay.h"
@@ -16,52 +19,56 @@
 #include "Timer.h"
 #include "ADC.h"
 
-//Device libraries
 #include "Xbee.h"
 #include "Button.h"
 #include "IndicationGPIOs.h"
 #include "ADXL362.h"
 #include "A2035H.h"
 #include "sdCard.h"
-
-//Dewi defines
-#define RSSI_MESSAGE_0 "1 0"
-#define RSSI_MESSAGE_1 "1 1"
-#define BAUD_9600 9600
-#define BAUD_4800 4800
-
-//ModuleStatus defines
+/*
+ * Module state defines
+ */
 #define MODULE_NOT_RUNNING 0x04
 #define MODULE_SETUP_STATE 0x05
 #define MODULE_APPLYING_PARAMS 0x06
 #define MODULE_IDLE_READY 0x0C
 #define MODULE_RUNNING 0x08
 #define MODULE_TURNING_OFF 0x10
-
-//Xbee globals
+/*
+ * Any other defines
+ */
+#define RSSI_MESSAGE_0 "1 0"
+#define RSSI_MESSAGE_1 "1 1"
+#define GPS_MSG_INIT_DELAY 400
+/*
+ * XBEE globals
+ */
 static char recievePacket[64];
 static bool dataUpdeted = false;
 volatile uint8_t length;
 bool readingPacket = false;
-uint8_t state = 1;
-// last 4 lsb -> |ready|idle|applying params|setup|
-uint8_t moduleStatus= MODULE_NOT_RUNNING;
+/*
+ * Module globals
+ */
+volatile uint8_t state = 1;
+volatile uint8_t moduleStatus = MODULE_NOT_RUNNING;
 uint8_t turnOffTimer = 0;
-
-//Gps globals
-char gpsReceiveString[80];
+uint32_t globalCounter = 0;
+/*
+ * GPS globals
+ */
+char gpsReceiveString[96];
 uint8_t gpsReadIterator;
 volatile bool gpsDataUpdated = false;
 
-//DEWI globals
-uint32_t globalCounter = 0;
-
 int main(void){
-
-	//Local variables for xbee
-	char transmitString[8];
-	uint8_t errorTimer = 20;
-	//Locals for ADXL
+	/*
+	 * Local variables for XBEE
+	 */
+	char transmitString[16];
+	/*
+	 * Local variables for Accelerometer
+	 */
 	int16_t z = 0;
 	int16_t z_low = 0;
 	int16_t z_high = 0;
@@ -69,9 +76,9 @@ int main(void){
 	int16_t x_low = 0;
 	int16_t x_high = 0;
 	char messurementString[6];
-	//variable for iterations
-	int i;
-	//variables for gps
+	/*
+	 * Local variables for GPS
+	 */
 	char* ptr;
 	char* tmpPtr;
     char ts[11] = " ";
@@ -84,8 +91,9 @@ int main(void){
     char velocity[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
-	//variables for sd card
-	//initialize sdcard (it uses the same SPI as Xbee)
+	/*
+	 * Local variables for SD card
+	 */
 	uint8_t sdBuffer[512];
 	uint16_t sdBufferCurrentSymbol = 0;
 	uint8_t sector = 0;
@@ -93,63 +101,72 @@ int main(void){
 	uint32_t cluster = 0;
 	uint32_t filesize = 0;
 	uint16_t fatSect, fsInfoSector;
-	//Periph variable
+	/*
+	 * ADC, Timer and other loco's
+	 */
 	uint16_t ADC_value;
-	//Timer string
-	char timerString[8];
-
-	//Leds and buttons, gpio's
+	uint8_t errorTimer = 20;
+	/*
+	 * Initializing gpio's
+	 */
 	initializeUserButton();
-	initializeEveryGreenLed();
 	initializeEveryRedLed();
+	initializeEveryGreenLed();
 	setupGpsGpio();
-	//SPI attention pin for incoming data alert
+	adcPinConfig();
 	initializeXbeeATTnPin();
-	//Usart1 for debugging and serial communication
-	Usart1_Init(9600);
-	//System clock for delays
+	/*
+	 * Initializing peripherals
+	 */
+	Usart2_Init(BAUD_4800);
+	Usart1_Init(BAUD_9600);
+	ConfigureUsart2Interrupt();
+	//used for delayMs()
+	//not meant for using in interrupt routines
 	initialiseSysTick();
-	//SPI1 for xbee
+	//SPI1 for XBEE and SD card
 	InitialiseSPI1_GPIO();
 	InitialiseSPI1();
-	//Timer for counter (1s)
+	//SPI2 used for accelerometer
+	InitialiseSPI2_GPIO();
+	InitialiseSPI2();
+	//ADC is used for battery monitoring
+	adcConfig();
+	//Timer counter with i=100ms
 	Initialize_timer();
 	Timer_interrupt_enable();
-	//ADC for voltage control
-	adcPinConfig();
-	adcConfig();
-
-	//Xbee initialization (check if there arent unread data)
-	//... transmitter shouldn't have any received messages from others
+	/*
+	 * Initializing XBEE
+	 */
 	XBEE_CS_LOW();
 	while(errorTimer--){
 		SPI1_TransRecieve(0x00);
 	}
 	XBEE_CS_HIGH();
-
-	//Dewi Module wont start until the button is pressed
+	/*
+	 * Start module only when button is pressed
+	 * Meanwhile, check the battery voltage
+	 */
 	while(moduleStatus == MODULE_NOT_RUNNING){
     	ADC_value = (ADC_GetConversionValue(ADC1));
     	ADC_value = (ADC_value * 330) / 128;
     	batteryIndicationStartup(ADC_value);
     	blinkGreenLeds(7);
 	}
-
-	//12 seconds to choose the modules to use
-	//One redStartup take about 500ms, so let it spin for twenty times
-	//Default state is 1 (only acc is on)
+	/*
+	 * LED blinking that indicates need to...
+	 * choose the method for integrity detection
+	 */
 	turnOnGreenLeds(state);
 	for(errorTimer = 0 ; errorTimer < 6 ; errorTimer++){
-		redStartup(REAL_REAL_SLOW_DELAY);
+	redStartup(REAL_REAL_SLOW_DELAY);
 	}
-	//Setup state is cleared
 	moduleStatus = MODULE_APPLYING_PARAMS;
-
-	//ADXL362Z
+	/*
+	 * Initialize Accelerometer if chosen
+	 */
 	if(state&0x01){
 		//SPI2 for ADXL
-		InitialiseSPI2_GPIO();
-		InitialiseSPI2();
 		initializeADXL362();
 		blinkRedLed3();
 		while(!return_ADXL_ready()){
@@ -160,14 +177,12 @@ int main(void){
 			blinkRedLed3();
 		}
 	}
-
-	//GPS
+	/*
+	 * Initialize GPS if chosen
+	 */
+	//GPS module has 40 seconds to find enough satellites
+	errorTimer = 40;
 	if((state&0x02) >> 1){
-		//Usart 2 for gps communication
-		Usart2_Init(BAUD_4800);
-		ConfigureUsart2Interrupt();
-		errorTimer = 40;
-
 		turnGpsOn();
 
 		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN)){
@@ -175,28 +190,24 @@ int main(void){
 			delayMs(1000);
 		}
 
-		delayMs(400);
+		delayMs(GPS_MSG_INIT_DELAY);
 		gps_dissableMessage($GPGSA);
-		delayMs(400);
+		delayMs(GPS_MSG_INIT_DELAY);
 		gps_dissableMessage($GPGSV);
-		delayMs(400);
+		delayMs(GPS_MSG_INIT_DELAY);
 		gps_dissableMessage($GPRMC);
-		delayMs(400);
+		delayMs(GPS_MSG_INIT_DELAY);
 		gps_dissableMessage($GPVTG);
-		delayMs(400);
+		delayMs(GPS_MSG_INIT_DELAY);
 		gps_setRate($GPGGA, 1);
 
-		//Wait for enough satellites
 		while(fix[0] == '0' && errorTimer > 0 ){
 			if(gpsDataUpdated){
 				errorTimer--;
 				gpsDataUpdated = false;
 				messageIterator = 0;
-
 				 // Make sure that you are comparing GPGGA message
 				 // $PSRF and $GPVTG messages are possable at the startup
-
-
 				if(strncmp(gpsReceiveString,"$GPGGA", 6) == 0){
 					ptr = &gpsReceiveString[7]; //This value could change whether the $ is used or not
 					for(; messageIterator < 7; messageIterator ++){
@@ -219,15 +230,17 @@ int main(void){
 		}
 		else{
 			//if satellites found -> turn on $GPVTG to monitor velocity
-/*			delayMs(400);
+			delayMs(400);
 			gps_setRate($GPVTG,1);
 			delayMs(400);
 			blinkRedLed4();
-			gps_dissableMessage($GPGGA);*/
+			gps_dissableMessage($GPGGA);
 			SEND_SERIAL_MSG("SATs found...\r\n");
 		}
 	}
-	//SD
+	/*
+	 * Initialize SD if chosen
+	 */
 	if((state&0x04) >> 2){
 
 		errorTimer = 10;
@@ -243,29 +256,6 @@ int main(void){
 
 			findDetailsOfFAT(sdBuffer,&fatSect,&mstrDir, &fsInfoSector);
 			findDetailsOfFile("LOGFILE",sdBuffer,mstrDir,&filesize,&cluster,&sector);
-
-			SEND_SERIAL_BYTE(errorTimer+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":ERROR_TIMER\r\n");
-			SEND_SERIAL_BYTE(filesize+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":FILESIZE\r\n");
-			SEND_SERIAL_BYTE(sector+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":SECTOR\r\n");
-			SEND_SERIAL_BYTE(cluster+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":CLUSTER\r\n");
-			SEND_SERIAL_BYTE((fatSect%10000)/1000+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((fatSect%1000)/100+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((fatSect%100)/10+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((fatSect%10)+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":FAT_SECT\r\n");
-			SEND_SERIAL_BYTE((mstrDir%100000)/10000+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((mstrDir%10000)/1000+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((mstrDir%1000)/100+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((mstrDir%100)/10+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_BYTE((mstrDir%10)+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":MSTR_DIR\r\n");
-			SEND_SERIAL_BYTE(fsInfoSector+ASCII_DIGIT_OFFSET);
-			SEND_SERIAL_MSG(":FS_INFO_SECT\r\n");
-
 			/*
 			 * Program halts during this function
 			 */
@@ -277,10 +267,15 @@ int main(void){
 			appendTextToTheSD("\nNEW LOG", '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
 		}
 	}
+	/*
+	 * Send message to coordinator for time synchronization
+	 */
 
+	/*
+	 * Wait for input to start communication
+	 */
 	moduleStatus = MODULE_IDLE_READY;
 	turnOnGreenLeds(state);
-	SEND_SERIAL_MSG("NODE READY!!!\r\n");
 	while(moduleStatus == MODULE_IDLE_READY){
 		blinkGreenLeds(state);
 		redStartup(DELAY);
@@ -288,29 +283,42 @@ int main(void){
 
     while(1){
 
+    	/*
+    	 * Check in what state module is running
+    	 */
     	switch(moduleStatus){
 
     	case MODULE_RUNNING:
     		delayMs(600);
-    		//Transmit acc data
+        	/*
+        	 * Send Accelerometer data if chosen
+        	 */
     		if(state&0x01){
     		  	getX(&x,&x_low,&x_high);
     		    itoa(x, messurementString);
-    		    transmitString[0] = '0';
+    		    transmitString[0] = 'M';
     		    transmitString[1] = ' ';
-    		    strcpy(&transmitString[2],&messurementString[0]);
+    		    transmitString[2] = '0';
+    		    transmitString[3] = ' ';
+    		    strcpy(&transmitString[4],&messurementString[0]);
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
-    			//if sd card is active, log data to it
-    			if((state&0x04) >> 2){
+    			/*
+    			 * Log data to SD card if chosen
+    			 */
+/*    			if((state&0x04) >> 2){
     				itoa(globalCounter,timerString);
     				appendTextToTheSD(timerString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				appendTextToTheSD(transmitString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
-    			}
+    			}*/
+    			SEND_SERIAL_MSG(transmitString);
+    			SEND_SERIAL_MSG(" ACC\r\n");
     			xorGreenLed(0);
     		}
     		delayMs(600);
-    		//Transmit gps data
+        	/*
+        	 * Send GPS data if chosen
+        	 */
     		if((state&0x02) >> 1){
     			if(strncmp(gpsReceiveString,"$GPVTG" , 6) == 0){
     				gps_parseGPVTG(gpsReceiveString,velocity);
@@ -318,19 +326,21 @@ int main(void){
     			else{
     				strcpy(velocity,"999.9");
     			}
-    			SEND_SERIAL_MSG(gpsReceiveString);
-    			SEND_SERIAL_MSG(":GPS\r\n");
-       		    transmitString[0] = '1';
-        		transmitString[1] = ' ';
-        		strcpy(&transmitString[2],velocity);
+    		    transmitString[0] = 'M';
+    		    transmitString[1] = ' ';
+    		    transmitString[2] = '1';
+    		    transmitString[3] = ' ';
+        		strcpy(&transmitString[4],velocity);
     			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
-
-    			if((state&0x04) >> 2){
+    			/*
+    			 * Log data to SD card if chosen
+    			 */
+/*    			if((state&0x04) >> 2){
     				appendTextToTheSD(transmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
-    			}
+    			}*/
     			SEND_SERIAL_MSG(transmitString);
-    			SEND_SERIAL_MSG(" MESSAGE_SENT\r\n");
+    			SEND_SERIAL_MSG(" GPS\r\n");
     			xorGreenLed(1);
     		}
     		break;
@@ -361,16 +371,18 @@ int main(void){
     		moduleStatus = MODULE_IDLE_READY;
     		break;
     	}
-   	}
+    }
 }
 
+/*
+ * Interrupt routines
+ */
 void USART2_IRQHandler(void){
 	if (USART_GetITStatus(USART2, USART_IT_RXNE) != RESET){
 		if((gpsReceiveString[gpsReadIterator++] = USART_ReceiveData(USART2)) == '\n'){
 			gpsDataUpdated = true;
 			gpsReadIterator = 0;
 		}
-
 	}
 }
 
@@ -382,7 +394,7 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 			moduleStatus = MODULE_SETUP_STATE;
 		}
 		else if(moduleStatus == MODULE_SETUP_STATE){
-			if(state++ > 7){
+			if(++state > 7){
 				state = 0;
 			}
 			turnOnGreenLeds(state);
@@ -391,7 +403,7 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 			if(turnOffTimer > 0)
 				moduleStatus = MODULE_TURNING_OFF;
 			else
-				moduleStatus = MODULE_RUNNING;	
+				moduleStatus = MODULE_RUNNING;
 		}
 		else if(moduleStatus == MODULE_RUNNING){
 			turnOffTimer = 10;
@@ -441,11 +453,5 @@ void TIM2_IRQHandler()
 		globalCounter++;
 	}
 }
-
-
-
-
-
-
 
 

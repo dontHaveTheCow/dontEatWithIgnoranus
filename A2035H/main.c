@@ -19,12 +19,9 @@ volatile bool gpsTurnOff = false;
 volatile bool gpsTurnOn = false;
 char gpsReceiveString[96];
 uint8_t gpsReadIterator = 0;
-volatile bool readingNMEA = false;
-volatile bool readingGPGGA = false;
 volatile bool gpsDataUpdated = false;
 
 uint8_t errorTimer;
-uint8_t state = 1;
 
 int main(void)
 {
@@ -55,6 +52,7 @@ int main(void)
 	ConfigureUsart2Interrupt();
 	//spi used for sd card
 
+	delayMs(1000);
 	turnGpsOn();
 
 	while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN)){

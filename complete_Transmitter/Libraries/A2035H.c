@@ -38,7 +38,7 @@ void setupGpsGpio(void){
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	GPIO_SetBits(GPIOC,GPIO_Pin_2);
+	GPIO_SetBits(GPIOC, RESET_PIN);
 
 	//Initialize input for WAKEUP_PIN
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC,  ENABLE);
