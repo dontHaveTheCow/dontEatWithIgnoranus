@@ -133,7 +133,7 @@ uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte){
 	return data;
 }
 
-void transmitRequest(uint32_t adrHigh, uint32_t adrLow, uint8_t transmitOption, char* data){
+void transmitRequest(uint32_t adrHigh, uint32_t adrLow, uint8_t transmitOption, uint8_t frameID, char* data){
 
 	int8_t cheksum = 0;
 	uint8_t  lenghtOfData, i = 0;
@@ -145,8 +145,8 @@ void transmitRequest(uint32_t adrHigh, uint32_t adrLow, uint8_t transmitOption, 
 	SPI1_TransRecieve(14 + lenghtOfData);
 	SPI1_TransRecieve(0x10);	//FrameType
 	cheksum += 0x10;
-	SPI1_TransRecieve(0x01);	//Frame ID
-	cheksum += 0x01;
+	SPI1_TransRecieve(frameID);	//Frame ID
+	cheksum += frameID;
 	SPI1_TransRecieve(adrHigh >> 24);	//64bit adress
 	cheksum += adrHigh >> 24;
 	SPI1_TransRecieve(adrHigh >> 16);

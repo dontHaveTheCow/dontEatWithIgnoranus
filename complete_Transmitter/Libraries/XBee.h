@@ -29,6 +29,6 @@ void apply1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1);
 void queue1Param(uint8_t MSbyte, uint8_t LSbyte, uint8_t param1);
 
 uint32_t readModuleParams(uint8_t MSbyte, uint8_t LSbyte);
-void transmitRequest(uint32_t adrHigh, uint32_t adrLow, uint8_t transmitOption, char* data);
+void transmitRequest(uint32_t adrHigh, uint32_t adrLow, uint8_t transmitOption, uint8_t frameID, char* data);
 
 #endif

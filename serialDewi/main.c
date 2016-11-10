@@ -10,7 +10,7 @@
 #include "SysTickDelay.h"
 #include "Timer.h"
 
-// Led define
+//Led define
 #define TOGGLE_REDLED_SERIAL() GPIOB->ODR ^= GPIO_Pin_5
 #define TOGGLE_REDLED_XBEE() GPIOB->ODR ^= GPIO_Pin_6
 //DEBUGGING macro

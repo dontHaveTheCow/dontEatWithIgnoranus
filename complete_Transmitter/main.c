@@ -40,13 +40,23 @@
 #define RSSI_MESSAGE_0 "1 0"
 #define RSSI_MESSAGE_1 "1 1"
 #define GPS_MSG_INIT_DELAY 400
+#define ERROR_TIMER_COUNT 30
+#define TIMER_SYNC_DELAY 5
+
+#define COORDINATOR_ADDR_HIGH 0x0013A200
+#define COORDINATOR_ADDR_LOW 0x40E3E13C
+#define SERIAL_ADDR_HIGH 0x0013A200
+#define SERIAL_ADDR_LOW 0x40E32A94
+
+#define XBEE_DATA_MODE_OFFSET 12
+#define XBEE_DATA_TYPE_OFFSET 14
 /*
  * XBEE globals
  */
-static char recievePacket[64];
-static bool dataUpdeted = false;
-volatile uint8_t length;
-bool readingPacket = false;
+char xbeeReceiveBuffer[255];
+volatile bool xbeeDataUpdated = false;
+volatile uint8_t length,errorTimer,cheksum;
+bool xbeeReading = false;
 /*
  * Module globals
  */
@@ -54,6 +64,7 @@ volatile uint8_t state = 1;
 volatile uint8_t moduleStatus = MODULE_NOT_RUNNING;
 uint8_t turnOffTimer = 0;
 uint32_t globalCounter = 0;
+bool SPI1_Busy = false;
 /*
  * GPS globals
  */
@@ -65,7 +76,7 @@ int main(void){
 	/*
 	 * Local variables for XBEE
 	 */
-	char transmitString[16];
+	char xbeeTransmitString[32];
 	/*
 	 * Local variables for Accelerometer
 	 */
@@ -152,14 +163,62 @@ int main(void){
     	ADC_value = (ADC_value * 330) / 128;
     	batteryIndicationStartup(ADC_value);
     	blinkGreenLeds(7);
+
+    	//if node is initialized through another XBEE
+    	if(xbeeDataUpdated){
+
+    		if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
+    			if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
+    				state = 0x07;
+    				break;
+    			}
+    			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
+    				//Accelerometer
+    				state |=0x01;
+    				break;
+    			}
+    			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
+    				//GPS
+    				state |=0x02;
+    				break;
+    			}
+    			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
+    				//SD
+    				state &=0x04;
+    				break;
+    			}
+    		}
+    		xbeeDataUpdated = false;
+    	}
 	}
 	/*
 	 * LED blinking that indicates need to...
 	 * choose the method for integrity detection
 	 */
 	turnOnGreenLeds(state);
-	for(errorTimer = 0 ; errorTimer < 6 ; errorTimer++){
+	for(errorTimer = 0 ; errorTimer < 8 ; errorTimer++){
 	redStartup(REAL_REAL_SLOW_DELAY);
+	turnOnGreenLeds(state);
+	if(xbeeDataUpdated){
+		if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
+			if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
+				state = 0x07;
+			}
+			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
+				//Accelerometer
+				state |=0x01;
+			}
+			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
+				//GPS
+				state |=0x02;
+			}
+			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
+				//SD
+				state |=0x04;
+			}
+		}
+	xbeeDataUpdated = false;
+	}
 	}
 	moduleStatus = MODULE_APPLYING_PARAMS;
 	/*
@@ -168,26 +227,29 @@ int main(void){
 	if(state&0x01){
 		//SPI2 for ADXL
 		initializeADXL362();
-		blinkRedLed3();
+		blinkRedLed1();
 		while(!return_ADXL_ready()){
 			//wait time for caps to discharge
 			delayMs(2000);
 			initializeADXL362();
 			delayMs(1000);
-			blinkRedLed3();
+			blinkRedLed1();
 		}
 	}
 	/*
 	 * Initialize GPS if chosen
 	 */
 	//GPS module has 40 seconds to find enough satellites
-	errorTimer = 40;
+	errorTimer = 50;
 	if((state&0x02) >> 1){
 		turnGpsOn();
 
-		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN)){
-			blinkRedLed2();
+		while(!GPIO_ReadInputDataBit(GPS_PORTC,WAKEUP_PIN) && errorTimer > 0){
+			turnGpsOn();
 			delayMs(1000);
+			blinkRedLed2();
+			errorTimer--;
+			SEND_SERIAL_MSG("Pulling GPS pin...\r\n");
 		}
 
 		delayMs(GPS_MSG_INIT_DELAY);
@@ -219,7 +281,7 @@ int main(void){
 					}
 				}
 				SEND_SERIAL_MSG("Waiting for sats...\r\n");
-				blinkRedLed4();
+				blinkRedLed2();
 			}
 		}
 		//if not enough satellites are found, turn off gps
@@ -233,7 +295,7 @@ int main(void){
 			delayMs(400);
 			gps_setRate($GPVTG,1);
 			delayMs(400);
-			blinkRedLed4();
+			blinkRedLed2();
 			gps_dissableMessage($GPGGA);
 			SEND_SERIAL_MSG("SATs found...\r\n");
 		}
@@ -246,7 +308,7 @@ int main(void){
 		errorTimer = 10;
 		while(!initializeSD() && errorTimer-- > 1){
 			delayMs(300);
-			blinkRedLed5();
+			blinkRedLed3();
 		}
 		if(!errorTimer){
 			//If sd card doesnt turn on, dont log anything to it
@@ -268,21 +330,43 @@ int main(void){
 		}
 	}
 	/*
-	 * Send message to coordinator for time synchronization
+	 * Send request to coordinator for time synchronization
 	 */
-
+	transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,"C 0");
+	/*
+	 * Send response to serial node about readiness
+	 */
+	delayMs(100);
+	strcpy(&xbeeTransmitString[0],"C N#");
+	xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+	xbeeTransmitString[5] = '\0';
+	transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 	/*
 	 * Wait for input to start communication
 	 */
 	moduleStatus = MODULE_IDLE_READY;
 	turnOnGreenLeds(state);
 	while(moduleStatus == MODULE_IDLE_READY){
+		/*
+		 * While indicating need for input
+		 * Check if coordinator has sent ACK message
+		 */
+		if(xbeeDataUpdated){
+			if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
+				if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == '1'){
+					globalCounter = atoi(&xbeeReceiveBuffer[16]) + TIMER_SYNC_DELAY;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'K'){
+					moduleStatus = MODULE_RUNNING;
+				}
+			}
+			xbeeDataUpdated = false;
+		}
 		blinkGreenLeds(state);
 		redStartup(DELAY);
 	}
 
     while(1){
-
     	/*
     	 * Check in what state module is running
     	 */
@@ -296,22 +380,22 @@ int main(void){
     		if(state&0x01){
     		  	getX(&x,&x_low,&x_high);
     		    itoa(x, messurementString);
-    		    transmitString[0] = 'M';
-    		    transmitString[1] = ' ';
-    		    transmitString[2] = '0';
-    		    transmitString[3] = ' ';
-    		    strcpy(&transmitString[4],&messurementString[0]);
-    			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+    		    xbeeTransmitString[0] = 'M';
+    		    xbeeTransmitString[1] = ' ';
+    		    xbeeTransmitString[2] = '0';
+    		    xbeeTransmitString[3] = ' ';
+    		    strcpy(&xbeeTransmitString[4],&messurementString[0]);
+    			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
     			/*
     			 * Log data to SD card if chosen
     			 */
 /*    			if((state&0x04) >> 2){
     				itoa(globalCounter,timerString);
     				appendTextToTheSD(timerString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
-    				appendTextToTheSD(transmitString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				appendTextToTheSD(xbeeTransmitString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
     			}*/
-    			SEND_SERIAL_MSG(transmitString);
+    			SEND_SERIAL_MSG(xbeeTransmitString);
     			SEND_SERIAL_MSG(" ACC\r\n");
     			xorGreenLed(0);
     		}
@@ -326,20 +410,20 @@ int main(void){
     			else{
     				strcpy(velocity,"999.9");
     			}
-    		    transmitString[0] = 'M';
-    		    transmitString[1] = ' ';
-    		    transmitString[2] = '1';
-    		    transmitString[3] = ' ';
-        		strcpy(&transmitString[4],velocity);
-    			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, transmitString);
+    		    xbeeTransmitString[0] = 'M';
+    		    xbeeTransmitString[1] = ' ';
+    		    xbeeTransmitString[2] = '1';
+    		    xbeeTransmitString[3] = ' ';
+        		strcpy(&xbeeTransmitString[4],velocity);
+    			transmitRequest(0x0013A200, 0x40E3E13C, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
     			/*
     			 * Log data to SD card if chosen
     			 */
 /*    			if((state&0x04) >> 2){
-    				appendTextToTheSD(transmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
+    				appendTextToTheSD(xbeeTransmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
     			}*/
-    			SEND_SERIAL_MSG(transmitString);
+    			SEND_SERIAL_MSG(xbeeTransmitString);
     			SEND_SERIAL_MSG(" GPS\r\n");
     			xorGreenLed(1);
     		}
@@ -371,6 +455,21 @@ int main(void){
     		moduleStatus = MODULE_IDLE_READY;
     		break;
     	}
+
+		if(xbeeDataUpdated){
+			if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
+				if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'K'){
+					moduleStatus = MODULE_RUNNING;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'L'){
+					moduleStatus = MODULE_IDLE_READY;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'M'){
+					moduleStatus = MODULE_TURNING_OFF;
+				}
+			}
+			xbeeDataUpdated = false;
+		}
     }
 }
 
@@ -412,34 +511,35 @@ void EXTI4_15_IRQHandler(void)					//External interrupt handlers
 		EXTI_ClearITPendingBit(EXTI_Line8);
 	}
 
-	if(EXTI_GetITStatus(EXTI_Line4) == SET){	//Handler for Radio ATTn pin interrupt
+	if(EXTI_GetITStatus(EXTI_Line4) == SET){	//Handler for Radio ATTn pin interrupt (data ready indicator)
 
-		if(!readingPacket){
-
-			uint8_t numberOfDumpBytes = 0;
-			uint8_t cheksum = 0;
+		if(xbeeReading == false && SPI1_Busy == false){
+			errorTimer, cheksum = 0;
+			xbeeReading = true;
 			GPIO_ResetBits(GPIOA,GPIO_Pin_4);
-
 			while(SPI1_TransRecieve(0x00) != 0x7E){	//Wait for start delimiter
-				numberOfDumpBytes++;
-				if(numberOfDumpBytes >5)			//Exit loop if there is no start delimiter
+				errorTimer++;
+				if(errorTimer > ERROR_TIMER_COUNT)			//Exit loop if there is no start delimiter
 					break;
 			}
-			readingPacket = true;
-			SPI1_TransRecieve(0x00);
-			length = SPI1_TransRecieve(0x00);
-			uint8_t i = 0;
-
-			for(; i < length; i ++ ){				//Read data based on packet length
-				recievePacket[i] = SPI1_TransRecieve(0x00);
-				cheksum += recievePacket[i];
+			if(errorTimer < ERROR_TIMER_COUNT){
+				SPI1_TransRecieve(0x00);
+				length = SPI1_TransRecieve(0x00);
+				uint8_t i = 0;
+				for(; i < length; i ++ ){				//Read data based on packet length
+					xbeeReceiveBuffer[i] = SPI1_TransRecieve(0x00);
+					cheksum += xbeeReceiveBuffer[i];
+				}
+				xbeeReceiveBuffer[i] = '\0';
+				cheksum += SPI1_TransRecieve(0x00);
+				if(cheksum == 0xFF)
+					xbeeDataUpdated = true;					//Data is updated if checksum is true
+				xbeeReading = false;
+				GPIO_SetBits(GPIOA,GPIO_Pin_4);
 			}
-			cheksum += SPI1_TransRecieve(0x00);
-			if(cheksum == 0xFF)
-				dataUpdeted = true;					//Data is updated if checksum is true
-
-			readingPacket = false;
-			GPIO_SetBits(GPIOA,GPIO_Pin_4);
+			else{
+				xbeeReading = false;
+			}
 		}
 		EXTI_ClearITPendingBit(EXTI_Line4);
 	}
@@ -451,6 +551,7 @@ void TIM2_IRQHandler()
 	{
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 		globalCounter++;
+
 	}
 }
 
