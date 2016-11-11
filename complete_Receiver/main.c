@@ -135,7 +135,7 @@ int main(void){
 	node[3].errorByte = 0;
 	node[3].avrRSSI = 0;
 	node[3].avarageRSSIcount = 0;
-	node[4].packetTime = 0;
+	node[3].packetTime = 0;
 
 	//Serial node
 	node[4].adressHigh = 0x0013A200;
@@ -153,11 +153,15 @@ int main(void){
 	uint8_t AT_data[4];
 	uint8_t frameID;
 	char xbeeTransmitString[32];
+	uint32_t receivedAddressHigh = 0;
+	uint32_t receivedAddressLow = 0;
+	uint16_t rssiDiff;
 	/*
 	 *--- Accelerometer does not
 	 *--- have any variables
 	 *--- for coordinator
 	 */
+	uint16_t accDiff;
 	/*
 	 * Local variables for GPS
 	 */
@@ -173,6 +177,7 @@ int main(void){
     char velocityString[6] = " ";
     char *ptrToNMEA[] = {ts, lat, latd, lon, lond, fix, sats};
 	uint8_t messageIterator;
+	float velocityDiff;
 	/*
 	 * Local variables for SD card
 	 */
@@ -240,6 +245,12 @@ int main(void){
 		SPI1_TransRecieve(0x00);
 	}
 	XBEE_CS_HIGH();
+	delayMs(1000);
+	XBEE_CS_LOW();
+	while(errorTimer--){
+		SPI1_TransRecieve(0x00);
+	}
+	XBEE_CS_HIGH();
 
 	SEND_SERIAL_MSG("Waiting for input...\r\n");
 	while(moduleStatus == MODULE_NOT_RUNNING){
@@ -252,29 +263,51 @@ int main(void){
 
     	//if node is initialized through another XBEE
     	if(xbeeDataUpdated){
-
     		if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
     			if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
     				state = 0x07;
+    				delayMs(100);
+    				strcpy(&xbeeTransmitString[0],"C O#");
+    				xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    				xbeeTransmitString[5] = '\0';
+    				transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    		    	xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
     				//Accelerometer
     				state |=0x01;
+    				delayMs(100);
+    				strcpy(&xbeeTransmitString[0],"C O#");
+    				xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    				xbeeTransmitString[5] = '\0';
+    				transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    		    	xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
     				//GPS
     				state |=0x02;
+    				delayMs(100);
+    				strcpy(&xbeeTransmitString[0],"C O#");
+    				xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    				xbeeTransmitString[5] = '\0';
+    				transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    		    	xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
     				//SD
     				state &=0x04;
+    				delayMs(100);
+    				strcpy(&xbeeTransmitString[0],"C O#");
+    				xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    				xbeeTransmitString[5] = '\0';
+    				transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    		    	xbeeDataUpdated = false;
     				break;
     			}
     		}
-    	xbeeDataUpdated = false;
     	}
 	}
 
@@ -283,29 +316,51 @@ int main(void){
 	 * choose the method for integrity detection
 	 */
 	turnOnGreenLeds(state);
-	for(errorTimer = 0 ; errorTimer < 6 ; errorTimer++){
-		redStartup(REAL_REAL_SLOW_DELAY);
+	for(errorTimer = 0 ; errorTimer < 8 ; errorTimer++){
 		redStartup(REAL_REAL_SLOW_DELAY);
 		turnOnGreenLeds(state);
 		if(xbeeDataUpdated){
 			if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
 				if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
 					state = 0x07;
+					delayMs(100);
+					strcpy(&xbeeTransmitString[0],"C O#");
+					xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '\0';
+					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+			    	xbeeDataUpdated = false;
 				}
 				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
 					//Accelerometer
 					state |=0x01;
+					delayMs(100);
+					strcpy(&xbeeTransmitString[0],"C O#");
+					xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '\0';
+					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+			    	xbeeDataUpdated = false;
 				}
 				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
 					//GPS
 					state |=0x02;
+					delayMs(100);
+					strcpy(&xbeeTransmitString[0],"C O#");
+					xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '\0';
+					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+			    	xbeeDataUpdated = false;
 				}
 				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
 					//SD
 					state |=0x04;
+					delayMs(100);
+					strcpy(&xbeeTransmitString[0],"C O#");
+					xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '\0';
+					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+			    	xbeeDataUpdated = false;
 				}
 			}
-		xbeeDataUpdated = false;
 		}
 	}
 	moduleStatus = MODULE_APPLYING_PARAMS;
@@ -438,6 +493,62 @@ int main(void){
 				if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'K'){
 					moduleStatus = MODULE_RUNNING;
 				}
+				/*
+				 * If anyone wants to sync time
+				 */
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == '0'){
+
+					/*
+					 * Find the address
+					 */
+					i = 1;	//Remember that "Frame type" byte was the first one
+					receivedAddressHigh = 0;
+					receivedAddressLow = 0;
+
+					for(; i < 9; i++){	//Read address from received packet
+
+						if(i<5){
+							receivedAddressHigh |= xbeeReceiveBuffer[i] << 8*(4-i);
+						}
+						else{
+							receivedAddressLow |= xbeeReceiveBuffer[i] << 8*(8-i);
+						}
+					}
+					/*
+					 * Only the lowest part of the address differs
+					 * so compare just that
+					 */
+					for(n = 0; n < NUMBER_OF_NODES; n++){	//Find the matching node for the received address
+						if(receivedAddressLow == node[n].adressLow )
+							tmpNode = n;
+					}
+
+					itoa(globalCounter,timerString);
+	    		    xbeeTransmitString[0] = 'C';
+	    		    xbeeTransmitString[1] = ' ';
+	    		    xbeeTransmitString[2] = '1';
+	    		    xbeeTransmitString[3] = ' ';
+	    		    strcpy(&xbeeTransmitString[4],&timerString[0]);
+					SPI1_Busy = true;
+					transmitRequest(node[tmpNode].adressHigh, node[tmpNode].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
+					SPI1_Busy = false;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'C'){
+					if(xbeeReceiveBuffer[16] == 7){
+						transferNode[0] = true;
+						transferNode[1] = true;
+						transferNode[2] = true;
+						transferNode[3] = true;
+					}
+					else{
+						transferNode[atoi(&xbeeReceiveBuffer[16])] = true;
+					}
+					strcpy(&xbeeTransmitString[0],"C O#");
+					xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '\0';
+					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+			    	xbeeDataUpdated = false;
+				}
 			}
 			xbeeDataUpdated = false;
 		}
@@ -468,11 +579,13 @@ int main(void){
 							/*
 							 * If threshold was exceeded - raise an alarm bit
 							 */
-							if(abs(node[frameID-1].avrRSSI - node[frameID-1].measurment[RSSI_MEASUREMENT]) > thresholdRSSI){
+							rssiDiff = abs(node[frameID-1].avrRSSI - node[frameID-1].measurment[RSSI_MEASUREMENT]);
+
+							if(rssiDiff > thresholdRSSI){
 								node[frameID-1].errorByte |= 0x02;
-								SEND_SERIAL_BYTE((xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] / 10) + ASCII_DIGIT_OFFSET);
+/*								SEND_SERIAL_BYTE((xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] / 10) + ASCII_DIGIT_OFFSET);
 								SEND_SERIAL_BYTE((xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] % 10) + ASCII_DIGIT_OFFSET);
-								SEND_SERIAL_MSG(":RSSI_DANGER\r\n");
+								SEND_SERIAL_MSG(":RSSI_DANGER\r\n");*/
 			    				/*
 			    				 * Log to SD card if needed
 			    				 */
@@ -542,9 +655,9 @@ int main(void){
 						}else{
 							node[frameID-1].avrRSSI =  (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] + node[frameID-1].avrRSSI) / 2 ;
 						}
-						SEND_SERIAL_BYTE((node[frameID-1].avrRSSI / 10) + ASCII_DIGIT_OFFSET);
+/*						SEND_SERIAL_BYTE((node[frameID-1].avrRSSI / 10) + ASCII_DIGIT_OFFSET);
 						SEND_SERIAL_BYTE((node[frameID-1].avrRSSI % 10) + ASCII_DIGIT_OFFSET);
-						SEND_SERIAL_MSG(":AVR_RSSI\r\n");
+						SEND_SERIAL_MSG(":AVR_RSSI\r\n");*/
 						if((state&0x04) >> 2){
 		    				/*
 		    				 * Log to SD card if needed
@@ -594,14 +707,19 @@ int main(void){
 					}
 					if(transferNode[tmpNode] == true){
 						//Re-send data to serial node
-						if(node[tmpNode].state == ACC_STATE_CASE)
+						if(node[tmpNode].state == ACC_STATE_CASE){
 							strcpy(&xbeeTransmitString[0],"C E#");
-						else
+							itoa(accDiff,stringOfMessurement);
+						}
+						else{
 							strcpy(&xbeeTransmitString[0],"C F#");
+
+							itoa(velocityDiff,stringOfMessurement);
+						}
 						xbeeTransmitString[4] = tmpNode + ASCII_DIGIT_OFFSET;
 						xbeeTransmitString[5] = '#';
-						xbeeTransmitString[6] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] / 10) + ASCII_DIGIT_OFFSET;
-						xbeeTransmitString[7] = (xbeeReceiveBuffer[AT_COMMAND_DATA_INDEX] % 10) + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[6] = (rssiDiff / 10) + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[7] = (rssiDiff % 10) + ASCII_DIGIT_OFFSET;
 						xbeeTransmitString[8] = '#';
 						xbeeTransmitString[9] = node[frameID-1].errorByte + ASCII_DIGIT_OFFSET;
 						xbeeTransmitString[10] = '#';
@@ -667,16 +785,18 @@ int main(void){
 					//Measure the time when packet was received
 					node[tmpNode].packetTime = globalCounter;
 
-					//SEND_SERIAL_BYTE(tmpNode + 0x30);
+/*					SEND_SERIAL_BYTE(tmpNode + 0x30);
 					SEND_SERIAL_MSG(stringOfMessurement);
-					SEND_SERIAL_MSG(":Received\r\n");
+					SEND_SERIAL_MSG(":Received\r\n");*/
 
 					switch(node[tmpNode].state){
 						case ACC_STATE_CASE:
 							node[tmpNode].measurment[ACC_MEASUREMENT] = atoi(stringOfMessurement);
 							receiverNode.measurment[ACC_MEASUREMENT] = returnX_axis();
 
-							if(abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]) > thresholdACC){
+							accDiff = abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]);
+
+							if(accDiff > thresholdACC){
 								node[tmpNode].errorByte |= 0x01;
 								//add sd card accelerometer error code
 								if(((state&0x04) >> 2)){
@@ -707,7 +827,10 @@ int main(void){
 /*								SEND_SERIAL_MSG(velocityString);
 								SEND_SERIAL_MSG(":MyVel\r\n");*/
 							}
-							if(abs(receiverNode.velocity - node[tmpNode].velocity) > thresholdGPS){
+
+							velocityDiff = abs(receiverNode.velocity - node[tmpNode].velocity);
+
+							if(velocityDiff > thresholdGPS){
 								node[tmpNode].errorByte |= 0x04;
 								//SEND_SERIAL_MSG("GPS_DANGER\r\n");
 								//Error was measured - log it to sd card
@@ -852,12 +975,24 @@ int main(void){
 						break;
 					case ('K'):
 						moduleStatus = MODULE_RUNNING;
+						strcpy(&xbeeTransmitString[0],"C O#");
+						xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[5] = '\0';
+						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 						break;
 					case ('L'):
 						moduleStatus = MODULE_IDLE_READY;
+						strcpy(&xbeeTransmitString[0],"C O#");
+						xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[5] = '\0';
+						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 						break;
 					case ('M'):
 						moduleStatus = MODULE_TURNING_OFF;
+						strcpy(&xbeeTransmitString[0],"C O#");
+						xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[5] = '\0';
+						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 						break;
 					default:
 						break;
@@ -962,18 +1097,11 @@ int main(void){
     	 * Check timer error
     	 */
 
-    	/*
-    	 * Check whether the serial command was received
-    	 */
     }
 }
 
 /*
  * INTERRUPT ROUTINES
- */
-
-/*
- * USB-Serial interface USART interrupt
  */
 
 void USART2_IRQHandler(void){

@@ -154,6 +154,13 @@ int main(void){
 		SPI1_TransRecieve(0x00);
 	}
 	XBEE_CS_HIGH();
+	delayMs(1000);
+	errorTimer = 20;
+	XBEE_CS_LOW();
+	while(errorTimer--){
+		SPI1_TransRecieve(0x00);
+	}
+	XBEE_CS_HIGH();
 	/*
 	 * Start module only when button is pressed
 	 * Meanwhile, check the battery voltage
@@ -170,25 +177,48 @@ int main(void){
     		if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
     			if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
     				state = 0x07;
+    	    		delayMs(100);
+    	    		strcpy(&xbeeTransmitString[0],"C O#");
+    	    		xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    	    		xbeeTransmitString[5] = '\0';
+    	    		transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    				xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
     				//Accelerometer
     				state |=0x01;
+    	    		delayMs(100);
+    	    		strcpy(&xbeeTransmitString[0],"C O#");
+    	    		xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    	    		xbeeTransmitString[5] = '\0';
+    	    		transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    				xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
     				//GPS
     				state |=0x02;
+    	    		delayMs(100);
+    	    		strcpy(&xbeeTransmitString[0],"C O#");
+    	    		xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    	    		xbeeTransmitString[5] = '\0';
+    	    		transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    				xbeeDataUpdated = false;
     				break;
     			}
     			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
     				//SD
     				state &=0x04;
+    	    		delayMs(100);
+    	    		strcpy(&xbeeTransmitString[0],"C O#");
+    	    		xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+    	    		xbeeTransmitString[5] = '\0';
+    	    		transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+    				xbeeDataUpdated = false;
     				break;
     			}
     		}
-    		xbeeDataUpdated = false;
     	}
 	}
 	/*
@@ -197,28 +227,33 @@ int main(void){
 	 */
 	turnOnGreenLeds(state);
 	for(errorTimer = 0 ; errorTimer < 8 ; errorTimer++){
-	redStartup(REAL_REAL_SLOW_DELAY);
-	turnOnGreenLeds(state);
-	if(xbeeDataUpdated){
-		if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
-			if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
-				state = 0x07;
+		redStartup(REAL_REAL_SLOW_DELAY);
+		turnOnGreenLeds(state);
+		if(xbeeDataUpdated){
+			if(xbeeReceiveBuffer[XBEE_DATA_MODE_OFFSET] == 'C'){
+				if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'G'){
+					state = 0x07;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
+					//Accelerometer
+					state |=0x01;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
+					//GPS
+					state |=0x02;
+				}
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
+					//SD
+					state |=0x04;
+				}
 			}
-			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'H'){
-				//Accelerometer
-				state |=0x01;
-			}
-			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'I'){
-				//GPS
-				state |=0x02;
-			}
-			else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'J'){
-				//SD
-				state |=0x04;
-			}
+		xbeeDataUpdated = false;
+		delayMs(100);
+		strcpy(&xbeeTransmitString[0],"C O#");
+		xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+		xbeeTransmitString[5] = '\0';
+		transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 		}
-	xbeeDataUpdated = false;
-	}
 	}
 	moduleStatus = MODULE_APPLYING_PARAMS;
 	/*
@@ -469,6 +504,11 @@ int main(void){
 				}
 			}
 			xbeeDataUpdated = false;
+			delayMs(100);
+			strcpy(&xbeeTransmitString[0],"C O#");
+			xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+			xbeeTransmitString[5] = '\0';
+			transmitRequest(SERIAL_ADDR_HIGH,SERIAL_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 		}
     }
 }
