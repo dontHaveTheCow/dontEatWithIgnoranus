@@ -714,7 +714,7 @@ int main(void){
 						else{
 							strcpy(&xbeeTransmitString[0],"C F#");
 
-							itoa(velocityDiff,stringOfMessurement);
+							ftoa(velocityDiff,stringOfMessurement,1);
 						}
 						xbeeTransmitString[4] = tmpNode + ASCII_DIGIT_OFFSET;
 						xbeeTransmitString[5] = '#';
@@ -828,7 +828,10 @@ int main(void){
 								SEND_SERIAL_MSG(":MyVel\r\n");*/
 							}
 
-							velocityDiff = abs(receiverNode.velocity - node[tmpNode].velocity);
+							velocityDiff = receiverNode.velocity - node[tmpNode].velocity;
+
+							if(velocityDiff < 0)
+								velocityDiff *= -1.0;
 
 							if(velocityDiff > thresholdGPS){
 								node[tmpNode].errorByte |= 0x04;
@@ -958,20 +961,45 @@ int main(void){
 						/*
 						 *GET_DATA_NODE
 						 */
-						transferNode[atoi(&xbeeReceiveBuffer[16])] = true;
-						SEND_SERIAL_MSG("TRANSFARING ");
+						if(xbeeReceiveBuffer[16] == 7){
+							transferNode[0] = true;
+							transferNode[1] = true;
+							transferNode[2] = true;
+							transferNode[3] = true;
+						}
+						else{
+							transferNode[atoi(&xbeeReceiveBuffer[16])] = true;
+						}
+						strcpy(&xbeeTransmitString[0],"C O#");
+						xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[5] = '\0';
+						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+
+/*						SEND_SERIAL_MSG("TRANSFARING ");
 						SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
-						SEND_SERIAL_MSG(" NODE\r\n");
+						SEND_SERIAL_MSG(" NODE\r\n");*/
 
 						break;
 					case ('D'):
 						/*
 						 *STOP_DATA_NODE
 						 */
-						transferNode[atoi(&xbeeReceiveBuffer[16])] = false;
-						SEND_SERIAL_MSG("BREAK ");
+						if(xbeeReceiveBuffer[16] == 7){
+							transferNode[0] = false;
+							transferNode[1] = false;
+							transferNode[2] = false;
+							transferNode[3] = false;
+						}
+						else{
+							transferNode[atoi(&xbeeReceiveBuffer[16])] = false;
+						}
+						strcpy(&xbeeTransmitString[0],"C O#");
+						xbeeTransmitString[4] = state + ASCII_DIGIT_OFFSET;
+						xbeeTransmitString[5] = '\0';
+						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
+/*						SEND_SERIAL_MSG("BREAK ");
 						SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
-						SEND_SERIAL_MSG(" NODE\r\n");
+						SEND_SERIAL_MSG(" NODE\r\n");*/
 						break;
 					case ('K'):
 						moduleStatus = MODULE_RUNNING;
