@@ -117,6 +117,7 @@ int main(void){
 	 */
 	uint16_t ADC_value;
 	uint8_t errorTimer = 20;
+	char timerString[16] = " ";
 	/*
 	 * Initializing gpio's
 	 */
@@ -408,13 +409,13 @@ int main(void){
     	switch(moduleStatus){
 
     	case MODULE_RUNNING:
-    		delayMs(600);
+    		delayMs(800);
         	/*
         	 * Send Accelerometer data if chosen
         	 */
     		if(state&0x01){
-    		  	getX(&x,&x_low,&x_high);
-    		    itoa(x, messurementString);
+    		  	getZ(&z,&z_low,&z_high);
+    		    itoa(z, messurementString);
     		    xbeeTransmitString[0] = 'M';
     		    xbeeTransmitString[1] = ' ';
     		    xbeeTransmitString[2] = '0';
@@ -424,17 +425,15 @@ int main(void){
     			/*
     			 * Log data to SD card if chosen
     			 */
-/*    			if((state&0x04) >> 2){
+    			if((state&0x04) >> 2){
     				itoa(globalCounter,timerString);
     				appendTextToTheSD(timerString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				appendTextToTheSD(xbeeTransmitString, '\t', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
-    			}*/
-    			SEND_SERIAL_MSG(xbeeTransmitString);
-    			SEND_SERIAL_MSG(" ACC\r\n");
+    			}
     			xorGreenLed(0);
     		}
-    		delayMs(600);
+    		delayMs(800);
         	/*
         	 * Send GPS data if chosen
         	 */
@@ -454,12 +453,10 @@ int main(void){
     			/*
     			 * Log data to SD card if chosen
     			 */
-/*    			if((state&0x04) >> 2){
+    			if((state&0x04) >> 2){
     				appendTextToTheSD(xbeeTransmitString, '\n', &sdBufferCurrentSymbol, sdBuffer, "LOGFILE", &filesize, mstrDir, fatSect, &cluster, &sector);
     				xorGreenLed(2);
-    			}*/
-    			SEND_SERIAL_MSG(xbeeTransmitString);
-    			SEND_SERIAL_MSG(" GPS\r\n");
+    			}
     			xorGreenLed(1);
     		}
     		break;

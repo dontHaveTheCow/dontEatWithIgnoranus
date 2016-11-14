@@ -64,6 +64,7 @@ uint8_t turnOffTimer = 0;
 struct node receiverNode;
 bool SPI1_Busy = false;
 uint32_t globalCounter = 0;
+bool timerUpdated = false;
 /*
  * GPS globals
  */
@@ -155,7 +156,7 @@ int main(void){
 	char xbeeTransmitString[32];
 	uint32_t receivedAddressHigh = 0;
 	uint32_t receivedAddressLow = 0;
-	uint16_t rssiDiff;
+	uint16_t rssiDiff = 0;
 	/*
 	 *--- Accelerometer does not
 	 *--- have any variables
@@ -199,11 +200,13 @@ int main(void){
 	uint8_t tmpNode;//
 	char timerString[10];
 	char stringOfMessurement[6];
-	uint8_t thresholdACC = 120;
+	uint16_t thresholdACC = 120;
 	uint8_t thresholdGPS = 5;
 	uint8_t thresholdRSSI = 10;
+	uint16_t thresholdTIM = 10; //10*100ms=1s
 	bool transferNode[4] = {false,false,false,false};
 	char thesholdString[8];
+	uint16_t timDiff = 0;
 	/*
 	 * Initializing gpio's
 	 */
@@ -254,12 +257,12 @@ int main(void){
 
 	SEND_SERIAL_MSG("Waiting for input...\r\n");
 	while(moduleStatus == MODULE_NOT_RUNNING){
-   	ADC_value = (ADC_GetConversionValue(ADC1));
-    	ADC_value = (ADC_value * 330) / 128;
-    	batteryIndicationStartup(ADC_value);
-    	blinkGreenLeds(i++);
-    	if(i > 7)
-    		i = 1;
+		ADC_value = (ADC_GetConversionValue(ADC1));
+		ADC_value = (ADC_value * 330) / 128;
+		batteryIndicationStartup(ADC_value);
+		blinkGreenLeds(i++);
+		if(i > 7)
+			i = 1;
 
     	//if node is initialized through another XBEE
     	if(xbeeDataUpdated){
@@ -534,7 +537,7 @@ int main(void){
 					SPI1_Busy = false;
 				}
 				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'C'){
-					if(xbeeReceiveBuffer[16] == 7){
+					if(xbeeReceiveBuffer[16] == '7'){
 						transferNode[0] = true;
 						transferNode[1] = true;
 						transferNode[2] = true;
@@ -548,6 +551,18 @@ int main(void){
 					xbeeTransmitString[5] = '\0';
 					transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 			    	xbeeDataUpdated = false;
+				}
+
+				else if(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET] == 'S'){
+					/*
+					 * GET_BATTERY
+					 */
+					ADC_value = (ADC_GetConversionValue(ADC1));
+					ADC_value = (ADC_value * 330) / 128;
+					itoa(ADC_value,thesholdString);
+					strcpy(&xbeeTransmitString[0],"C U ");
+					strcpy(&xbeeTransmitString[4],thesholdString);
+					transmitRequest(node[4].adressHigh, node[4].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
 				}
 			}
 			xbeeDataUpdated = false;
@@ -792,7 +807,7 @@ int main(void){
 					switch(node[tmpNode].state){
 						case ACC_STATE_CASE:
 							node[tmpNode].measurment[ACC_MEASUREMENT] = atoi(stringOfMessurement);
-							receiverNode.measurment[ACC_MEASUREMENT] = returnX_axis();
+							receiverNode.measurment[ACC_MEASUREMENT] = returnZ_axis()     ;
 
 							accDiff = abs(receiverNode.measurment[ACC_MEASUREMENT] - node[tmpNode].measurment[ACC_MEASUREMENT]);
 
@@ -878,9 +893,9 @@ int main(void){
 						SPI1_Busy = true;
 						transmitRequest(node[tmpNode].adressHigh, node[tmpNode].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
 						SPI1_Busy = false;
-						SEND_SERIAL_MSG("Node ");
+/*						SEND_SERIAL_MSG("Node ");
 						SEND_SERIAL_BYTE(tmpNode+ASCII_DIGIT_OFFSET);
-						SEND_SERIAL_MSG(" Timer synchronized...\r\n");
+						SEND_SERIAL_MSG(" Timer synchronized...\r\n");*/
 
 						break;
 
@@ -902,9 +917,9 @@ int main(void){
 						 *SET_THRACC
 						 */
 						thresholdACC = atoi(&xbeeReceiveBuffer[16]);
-						SEND_SERIAL_MSG("ACC_THRESHOLD ");
+/*						SEND_SERIAL_MSG("ACC_THRESHOLD ");
 						SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
-						SEND_SERIAL_MSG("\r\n");
+						SEND_SERIAL_MSG("\r\n");*/
 						break;
 					case ('4'):
 						/*
@@ -912,9 +927,11 @@ int main(void){
 						 */
 						thresholdGPS = atoi(&xbeeReceiveBuffer[16]);
 
+/*
 						SEND_SERIAL_MSG("GPS_THRESHOLD ");
 						SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
 						SEND_SERIAL_MSG("\r\n");
+*/
 
 						break;
 					case ('5'):
@@ -922,9 +939,11 @@ int main(void){
 						 *SET_THRRSSI
 						 */
 						thresholdRSSI = atoi(&xbeeReceiveBuffer[16]);
+/*
 						SEND_SERIAL_MSG("RSSI_THRESHOLD ");
 						SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
 						SEND_SERIAL_MSG("\r\n");
+*/
 
 						break;
 					case ('6'):
@@ -961,7 +980,7 @@ int main(void){
 						/*
 						 *GET_DATA_NODE
 						 */
-						if(xbeeReceiveBuffer[16] == 7){
+						if(xbeeReceiveBuffer[16] == '7'){
 							transferNode[0] = true;
 							transferNode[1] = true;
 							transferNode[2] = true;
@@ -1022,6 +1041,33 @@ int main(void){
 						xbeeTransmitString[5] = '\0';
 						transmitRequest(node[4].adressHigh,node[4].adressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 						break;
+					case ('P'):
+							/*
+							 * SET_THRRTIM
+							 */
+						thresholdTIM = atoi(&xbeeReceiveBuffer[16]);
+
+						break;
+					case ('R'):
+							/*
+							 * GET_THRRTIM
+							 */
+						itoa(thresholdTIM,thesholdString);
+						strcpy(&xbeeTransmitString[0],"C T ");
+						strcpy(&xbeeTransmitString[4],thesholdString);
+						transmitRequest(node[tmpNode].adressHigh, node[tmpNode].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
+						break;
+					case ('S'):
+							/*
+							 * GET_BATTERY
+							 */
+						ADC_value = (ADC_GetConversionValue(ADC1));
+						ADC_value = (ADC_value * 330) / 128;
+						itoa(ADC_value,thesholdString);
+						strcpy(&xbeeTransmitString[0],"C U ");
+						strcpy(&xbeeTransmitString[4],thesholdString);
+						transmitRequest(node[tmpNode].adressHigh, node[tmpNode].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
+						break;
 					default:
 						break;
 					}
@@ -1071,7 +1117,6 @@ int main(void){
 			if(errorTimer < ERROR_TIMER_COUNT){
 				SPI1_TransRecieve(0x00);
 				length = SPI1_TransRecieve(0x00);
-				//printf("Lenght: %d\n", length);
 				uint8_t i = 0;
 				for(; i < length; i ++ ){				//Read data based on packet length
 					xbeeReceiveBuffer[i] = SPI1_TransRecieve(0x00);
@@ -1081,7 +1126,6 @@ int main(void){
 				if(cheksum == 0xFF){
 					xbeeDataUpdated = true;
 				}
-				//printf("Checksum:%d\n",cheksum);
 				//Data is updated if checksum is true
 				xbeeReading = false;
 				XBEE_CS_HIGH();
@@ -1121,10 +1165,31 @@ int main(void){
     		moduleStatus = MODULE_IDLE_READY;
     	}
 
-    	/*
-    	 * Check timer error
-    	 */
+    	if(timerUpdated == true){
 
+    		/*
+    		 * We are not interested in checkin serial nodes timeout
+    		 */
+    		for(i = 0; i < NUMBER_OF_NODES-1; i++){
+    			if(node[i].packetTime == 0){
+    				continue;
+    			}
+    			timDiff = globalCounter - node[i].packetTime;
+    			if(timDiff > thresholdTIM){
+    				/*
+    				 * TIM_DNG
+    				 */
+    				node[i].packetTime = 0;
+					strcpy(&xbeeTransmitString[0],"C V#");
+					itoa(timDiff,stringOfMessurement);
+					xbeeTransmitString[4] = tmpNode + ASCII_DIGIT_OFFSET;
+					xbeeTransmitString[5] = '#';
+					strcpy(&xbeeTransmitString[6],stringOfMessurement);
+					transmitRequest(node[4].adressHigh, node[4].adressLow, TRANSOPT_DISACK, 0x00, xbeeTransmitString);
+    			}
+    		}
+    		timerUpdated = false;
+    	}
     }
 }
 
@@ -1207,5 +1272,6 @@ void TIM2_IRQHandler()
 	{
 		TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 		globalCounter++;
+		timerUpdated = true;
 	}
 }

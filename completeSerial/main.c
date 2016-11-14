@@ -51,7 +51,7 @@ bool serialUpdated = false;
 /*
  * XBEE globals
  */
-char xbeeReceiveBuffer[255];
+char xbeeReceiveBuffer[255] = " ";
 volatile bool xbeeDataUpdated = false;
 volatile uint8_t length,errorTimer,cheksum;
 bool SPI1_Busy = false;
@@ -147,7 +147,7 @@ int main(void)
     		 */
 			if(strcmp(key,"GET_TIME") == 0){
 
-				SEND_SERIAL_MSG("CURRENT_TIME#");
+				SEND_SERIAL_MSG("MSG#CURRENT_TIME#");
 				SEND_SERIAL_BYTE((globalCounter%1000000)/100000 + ASCII_DIGIT_OFFSET);
 				SEND_SERIAL_BYTE((globalCounter%100000)/10000 + ASCII_DIGIT_OFFSET);
 				SEND_SERIAL_BYTE((globalCounter%10000)/1000 + ASCII_DIGIT_OFFSET);
@@ -170,7 +170,7 @@ int main(void)
 			}
 			else if(strcmp(key,"SET_EVENT") == 0){
 
-				SEND_SERIAL_MSG("EVENT#");
+				SEND_SERIAL_MSG("EVENTS#");
 				SEND_SERIAL_MSG(value);
 				SEND_SERIAL_BYTE('#');
 				itoa(globalCounter,timerString);
@@ -180,28 +180,28 @@ int main(void)
 			else if(strcmp(key,"SET_EVENT_COORD") == 0){
 
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,"C 2");
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#CMD#ACCEPTED...\r\n");
 			}
 			else if(strcmp(key,"SET_THRACC") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C 3 ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#CMD#ACCEPTED...\r\n");
 			}
 			else if(strcmp(key,"SET_THRGPS") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C 4 ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#CMD#ACCEPTED...\r\n");
 			}
 			else if(strcmp(key,"SET_THRRSSI") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C 5 ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#CMD#ACCEPTED...\r\n");
 			}
 			else if(strcmp(key,"GET_THRRSSI") == 0){
 
@@ -248,29 +248,29 @@ int main(void)
 				strcpy(&xbeeTransmitString[0],"C G ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"INIT_ALL") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C G ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"INIT_ACC_NODE") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C H ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 
 			}
 			else if(strcmp(key,"INIT_ACC_ALL") == 0){
@@ -278,15 +278,15 @@ int main(void)
 				strcpy(&xbeeTransmitString[0],"C H ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 
 			}
 			else if(strcmp(key,"INIT_GPS_NODE") == 0){
@@ -294,44 +294,44 @@ int main(void)
 				strcpy(&xbeeTransmitString[0],"C I ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"INIT_GPS_ALL") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C I ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"INIT_SD_NODE") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C J ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"INIT_SD_ALL") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C J ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(1000);
+				delayMs(2000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"START_ALL") == 0){
 
@@ -346,36 +346,36 @@ int main(void)
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 				delayMs(150);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"START_NODE") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C K ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"IDLE_ALL") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C L ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"IDLE_NODE") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C L ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"STOP_ALL") == 0){
 
@@ -383,44 +383,44 @@ int main(void)
 				strcat(xbeeTransmitString,value);
 
 				transmitRequest(node[0].addressHigh,node[0].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[1].addressHigh,node[1].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[2].addressHigh,node[2].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(node[3].addressHigh,node[3].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				delayMs(500);
+				delayMs(1000);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
 
-				SEND_SERIAL_MSG("MSG#PACKETS_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKETS#SENT...\r\n");
 			}
 			else if(strcmp(key,"STOP_NODE") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C M ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
-			else if(strcmp(key,"SET_THRRTIM") == 0){
+			else if(strcmp(key,"SET_THRTIM") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C P ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#CMD#ACCEPTED...\r\n");
 			}
-			else if(strcmp(key,"GET_THRRTIM") == 0){
+			else if(strcmp(key,"GET_THRTIM") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C R ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(COORDINATOR_ADDR_HIGH,COORDINATOR_ADDR_LOW,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#CMD_ACCEPTED...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"GET_BATTERY") == 0){
 
 				strcpy(&xbeeTransmitString[0],"C S ");
 				strcat(xbeeTransmitString,value);
 				transmitRequest(node[atoi(value)].addressHigh,node[atoi(value)].addressLow,TRANSOPT_DISACK, 0x00,xbeeTransmitString);
-				SEND_SERIAL_MSG("MSG#PACKET_SENT...\r\n");
+				SEND_SERIAL_MSG("DEBUG#PACKET#SENT...\r\n");
 			}
 			else if(strcmp(key,"PRINT_CMD") == 0){
 
@@ -441,23 +441,20 @@ int main(void)
 				SEND_SERIAL_MSG("MSG#GET_BATTERY#\r\n");
 				SEND_SERIAL_MSG("MSG#GET_DATA_NODE#\r\n");
 				SEND_SERIAL_MSG("MSG#STOP_DATA_NODE#\r\n");
-				SEND_SERIAL_MSG("<--INIT_COMMANDS-->");
-				SEND_SERIAL_MSG("INIT_NODE#\r\n");
-				SEND_SERIAL_MSG("INIT_ALL\r\n");
-				SEND_SERIAL_MSG("INIT_ACC_NODE#\r\n");
-				SEND_SERIAL_MSG("INIT_ACC_ALL\r\n");
-				SEND_SERIAL_MSG("INIT_GPS_NODE#\r\n");
-				SEND_SERIAL_MSG("INIT_GPS_ALL\r\n");
-				SEND_SERIAL_MSG("INIT_SD_NODE#\r\n");
-				SEND_SERIAL_MSG("INIT_GPS_ALL\r\n");
-				SEND_SERIAL_MSG("START_NODE#\r\n");
-				SEND_SERIAL_MSG("START_ALL\r\n");
-				SEND_SERIAL_MSG("IDLE_ALL\r\n");
-				SEND_SERIAL_MSG("INIT_NODE#\r\n");
-				SEND_SERIAL_MSG("STOP_ALL\r\n");
-				SEND_SERIAL_MSG("INIT_NODE#\r\n");
-
-
+				SEND_SERIAL_MSG("MSG#<--INIT_COMMANDS-->");
+				SEND_SERIAL_MSG("MSG#INIT_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_ACC_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_ACC_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_GPS_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_GPS_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_SD_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_GPS_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#START_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#START_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#IDLE_ALL\r\n");
+				SEND_SERIAL_MSG("MSG#INIT_NODE#\r\n");
+				SEND_SERIAL_MSG("MSG#STOP_ALL\r\n");
 			}
 			else{
 				// VERYWRONG DATA
@@ -473,7 +470,7 @@ int main(void)
 
 		if(strncmp((char*)&xbeeReceiveBuffer[XBEE_AT_COMMAND_INDEX], "SH", 2) == 0) {
 			if(xbeeReceiveBuffer[XBEE_AT_COMMAND_STATUS] == 0){
-				SEND_SERIAL_MSG("ADDR_HIGH#");
+				SEND_SERIAL_MSG("DEBUG#ADDRESS_HIGH#");
 				xbeeAddressHigh = (xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA] << 24)
 						+(xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA+1] << 16)
 						+(xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA+2] << 8)
@@ -482,12 +479,12 @@ int main(void)
 				SEND_SERIAL_MSG(xbeeAddressHighString);
 				SEND_SERIAL_MSG("\r\n");
 			}else{
-				SEND_SERIAL_MSG("SH_AT_COMMAND_REQUEST_ERROR\n");
+				SEND_SERIAL_MSG("DEBUG#SH_AT_COMMAND_REQUEST_ERROR\n");
 			}
 		}else if(strncmp((char*)&xbeeReceiveBuffer[XBEE_AT_COMMAND_INDEX], "SL", 2) == 0) {
 
 			if(xbeeReceiveBuffer[XBEE_AT_COMMAND_STATUS] == 0){
-				SEND_SERIAL_MSG("ADDR_LOW#");
+				SEND_SERIAL_MSG("DEBUG#ADDR_LOW#");
 				xbeeAddressLow = (xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA] << 24)
 						+(xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA+1] << 16)
 						+(xbeeReceiveBuffer[XBEE_AT_COMMAND_DATA+2] << 8)
@@ -497,7 +494,7 @@ int main(void)
 				SEND_SERIAL_MSG("\r\n");
 			}
 			else{
-				SEND_SERIAL_MSG("SL_AT_COMMAND_REQUEST_ERROR\n");
+				SEND_SERIAL_MSG("DEBUG#SL_AT_COMMAND_REQUEST_ERROR\n");
 			}
 		}
 		else {
@@ -522,20 +519,20 @@ int main(void)
 					break;
 				case ('1'):
 					globalCounter = atoi(&xbeeReceiveBuffer[16]) + TIMER_SYNC_DELAY;
-					SEND_SERIAL_MSG("MSG#TIMER_SYNCHRONIZED...\r\n");
+					SEND_SERIAL_MSG("MSG#TIMER#SYNCHRONIZED...\r\n");
 					break;
 				case ('9'):
-					SEND_SERIAL_MSG("RSSI_THRESHOLD#");
+					SEND_SERIAL_MSG("MSG#RSSI_THRESHOLD#");
 					SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
 					SEND_SERIAL_MSG("\r\n");
 					break;
 				case ('A'):
-					SEND_SERIAL_MSG("ACC_THRESHOLD#");
+					SEND_SERIAL_MSG("MSG#ACC_THRESHOLD#");
 					SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
 					SEND_SERIAL_MSG("\r\n");
 					break;
 				case ('B'):
-					SEND_SERIAL_MSG("GPS_THRESHOLD#");
+					SEND_SERIAL_MSG("MSG#GPS_THRESHOLD#");
 					SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
 					SEND_SERIAL_MSG("\r\n");
 					break;
@@ -660,11 +657,33 @@ int main(void)
 						if(receivedAddressLow == node[niterator].addressLow )
 							tmpNode = niterator;
 					}
-					SEND_SERIAL_MSG("MSG#NODE#");
+					SEND_SERIAL_MSG("MSG#");
+					SEND_SERIAL_MSG("CMD_ACCEPTED_NODE#");
 					SEND_SERIAL_BYTE(tmpNode + ASCII_DIGIT_OFFSET);
-					SEND_SERIAL_BYTE('#');
-					SEND_SERIAL_MSG("CMD_ACCEPTED\r\n");
+					SEND_SERIAL_MSG("\r\n");
 					break;
+				case ('T'):
+					SEND_SERIAL_MSG("MSG#TIM_THRESHOLD#");
+					SEND_SERIAL_MSG(&xbeeReceiveBuffer[16]);
+					SEND_SERIAL_MSG("\r\n");
+					break;
+				case ('U'):
+					SEND_SERIAL_MSG("MSG#BATTERY#");
+					SEND_SERIAL_BYTE(xbeeReceiveBuffer[16]);
+					SEND_SERIAL_BYTE('.');
+					SEND_SERIAL_BYTE(xbeeReceiveBuffer[17]);
+					SEND_SERIAL_BYTE(xbeeReceiveBuffer[18]);
+					SEND_SERIAL_MSG("\r\n");
+					break;
+				case ('V'):
+
+				SEND_SERIAL_BYTE(xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET+2]);
+				SEND_SERIAL_BYTE('#');
+				SEND_SERIAL_MSG("TIM_DNG#");
+				SEND_SERIAL_MSG(&xbeeReceiveBuffer[XBEE_DATA_TYPE_OFFSET+4]);
+				SEND_SERIAL_MSG("\r\n");
+
+				break;
 				default:
 					SEND_SERIAL_MSG("MSG#UNEXPECTED_XBEE_COMMAND...\r\n");
 					break;
@@ -672,18 +691,21 @@ int main(void)
 			}
 			break;
 			case XBEE_MODEM_STATUS:
-			SEND_SERIAL_MSG("MODEM STATUS...\r\n");
+			SEND_SERIAL_MSG("DEBUG#MODEM STATUS#");
 			if(xbeeReceiveBuffer[1] == 0x00){
 				SEND_SERIAL_MSG("HARDWARE RESET...\r\n");
 			}
+			else{
+				SEND_SERIAL_MSG("UNEXPECTED RESET...\r\n");
+			}
 			break;
 			case XBEE_TRANSMIT_STATUS:
-			SEND_SERIAL_MSG("TRANSMIT STATUS - ");
+			SEND_SERIAL_MSG("DEBUG#TRANSMIT STATUS");
 			if(xbeeReceiveBuffer[5] == 0x00){
-				SEND_SERIAL_MSG("SUCCESS...\r\n");
+				SEND_SERIAL_MSG("#SUCCESS...\r\n");
 			}
 			else{
-				SEND_SERIAL_MSG("FAIL - ");
+				SEND_SERIAL_MSG("#FAIL-");
 				SEND_SERIAL_BYTE(xbeeReceiveBuffer[5]);
 				SEND_SERIAL_MSG(" \r\n");
 			}
@@ -692,11 +714,11 @@ int main(void)
 			 * Parse Any other XBEE packet
 			 */
 			default:
-				SEND_SERIAL_MSG("MSG#UNEXPECTED XBEE PACKET(dec):");
+				SEND_SERIAL_MSG("DEBUG#UNEXPECTED XBEE PACKET(dec):");
 				SEND_SERIAL_BYTE(xbeeReceiveBuffer[XBEE_TYPE_OF_FRAME_INDEX]/100 + ASCII_DIGIT_OFFSET);
 				SEND_SERIAL_BYTE((xbeeReceiveBuffer[XBEE_TYPE_OF_FRAME_INDEX]%100)/10 + ASCII_DIGIT_OFFSET);
 				SEND_SERIAL_BYTE(xbeeReceiveBuffer[XBEE_TYPE_OF_FRAME_INDEX]%10 + ASCII_DIGIT_OFFSET);
-				SEND_SERIAL_MSG("\n");
+				SEND_SERIAL_MSG("\r\n");
 			break;
 			}
     		xbeeDataUpdated = false;
@@ -746,6 +768,7 @@ void USART1_IRQHandler(void){
 	if (USART_GetITStatus(USART1, USART_IT_RXNE) != RESET){
 
 		Usart1_Send(serialBuffer[packetLenght] = USART_ReceiveData(USART1));
+		//serialBuffer[packetLenght] = USART_ReceiveData(USART1);
 		if(serialBuffer[packetLenght++] == '\r'){
 			serialBuffer[packetLenght-1] = '\0';
 			TOGGLE_REDLED_SERIAL();
